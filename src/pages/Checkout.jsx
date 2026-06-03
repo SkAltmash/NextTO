@@ -388,11 +388,23 @@ export default function Checkout() {
         .join('\n');
 
       const sendTelegram = async (chatId, text) => {
-        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
-        });
+        console.log('Sending Telegram message to chatId:', chatId);
+        try {
+          const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+          });
+          if (!res.ok) {
+            const errBody = await res.json();
+            console.error('Telegram API Error details:', errBody);
+            throw new Error(errBody.description || 'Unknown Telegram Error');
+          }
+          console.log('Telegram message sent successfully');
+        } catch (err) {
+          console.error('Failed to send Telegram:', err);
+          throw err;
+        }
       };
 
       // 1️⃣  Restaurants
