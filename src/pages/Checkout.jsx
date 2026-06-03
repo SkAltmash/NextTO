@@ -255,17 +255,33 @@ export default function Checkout() {
 
       // Unique restaurant IDs across all cart items (for admin reference)
       const restaurantIds = [...new Set(cart.map((i) => i.restaurantId).filter(Boolean))];
-      let restaurantPhone = '';
+
+      // Fetch ALL unique restaurants in parallel so each item gets its own commission rate & phone
+      const restaurantDataMap = {}; // { [restaurantId]: { phone, commissionRate } }
       if (restaurantIds.length > 0) {
         try {
-          const restSnap = await getDoc(doc(db, 'restaurants', restaurantIds[0]));
-          if (restSnap.exists()) {
-            restaurantPhone = restSnap.data().phone ?? '';
-          }
+          const restSnaps = await Promise.all(
+            restaurantIds.map((rId) => getDoc(doc(db, 'restaurants', rId)))
+          );
+          restSnaps.forEach((snap) => {
+            if (snap.exists()) {
+              const d = snap.data();
+              restaurantDataMap[snap.id] = {
+                name: d.name ?? '',
+                phone: d.phone ?? '',
+                commissionRate: Number(d.commissionRate ?? 0),
+              };
+            }
+          });
         } catch (err) {
-          console.warn('Error fetching restaurant phone:', err);
+          console.warn('Error fetching restaurant data:', err);
         }
       }
+
+      // Keep the first restaurant's top-level fields for backward compat
+      const firstRestData = restaurantDataMap[restaurantIds[0]] ?? { name: '', phone: '', commissionRate: 0 };
+      const restaurantPhone = firstRestData.phone;
+      const restaurantName = firstRestData.name;
 
       const pickupDropItem = pickupDropDetails
         ? [{
@@ -278,18 +294,25 @@ export default function Checkout() {
           serviceType: 'pickup_drop',
         }]
         : [];
+
+      // Each cart item gets the commissionRate and phone of its own restaurant
       const orderItems = [
-        ...cart.map((i) => ({
-          productId: i.id,
-          productName: i.name,
-          quantity: i.qty,
-          price: i.discountPrice ?? i.price,
-          image: i.images?.[0] ?? '',
-          restaurantId: i.restaurantId ?? '',
-          restaurantPhone: i.restaurantId ? restaurantPhone : '',
-        })),
+        ...cart.map((i) => {
+          const rData = restaurantDataMap[i.restaurantId] ?? null;
+          return {
+            productId: i.id,
+            productName: i.name,
+            quantity: i.qty,
+            price: i.discountPrice ?? i.price,
+            image: i.images?.[0] ?? '',
+            restaurantId: i.restaurantId ?? '',
+            restaurantPhone: rData ? rData.phone : '',
+            commissionRate: rData ? rData.commissionRate : 0,
+          };
+        }),
         ...pickupDropItem,
       ];
+
       const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
       const orderDeliveryCharge = needsDeliveryArea ? deliveryCharge : 0;
       const finalTotalAmount = subtotal + orderDeliveryCharge;
@@ -312,8 +335,8 @@ export default function Checkout() {
         restaurantIds,
         prescriptionImageUrl: '',
         restaurantId: restaurantIds[0] ?? '',
-        restaurantName: cart.find((i) => i.restaurantId === restaurantIds[0])?.restaurantName ?? '',
-        restaurantPhone: restaurantPhone ?? '',
+        restaurantName,
+        restaurantPhone,
 
         // Items
         items: orderItems,
@@ -331,7 +354,7 @@ export default function Checkout() {
         deliveryPartnerName,
         deliveryPartnerEarning,
 
-        // Totals (0 for prescription — price TBD)
+        // Totals
         subtotal,
         totalAmount: finalTotalAmount,
 
@@ -352,15 +375,23 @@ export default function Checkout() {
 
       // ── Telegram notifications ─────────────────────────────────────────────
       const botToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+      const escapeHtml = (text) => {
+        if (!text) return '';
+        return String(text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      };
+
       const itemLines = cart
-        .map((i) => `  • ${i.name} × ${i.qty}  ₹${(i.discountPrice ?? i.price) * i.qty}`)
+        .map((i) => `  • ${escapeHtml(i.name)} × ${i.qty}  ₹${(i.discountPrice ?? i.price) * i.qty}`)
         .join('\n');
 
       const sendTelegram = async (chatId, text) => {
         await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' }),
+          body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
         });
       };
 
@@ -383,16 +414,16 @@ export default function Checkout() {
               if (!restChatId) return;
 
               const restItemLines = items
-                .map((i) => `  • ${i.name} × ${i.qty}  ₹${(i.discountPrice ?? i.price) * i.qty}`)
+                .map((i) => `  • ${escapeHtml(i.name)} × ${i.qty}  ₹${(i.discountPrice ?? i.price) * i.qty}`)
                 .join('\n');
               const restSubtotal = items.reduce(
                 (sum, i) => sum + (i.discountPrice ?? i.price) * i.qty, 0
               );
 
               const restaurantMsg =
-                `🛒 *New Order Received!*\n` +
-                `Order ID: \`${orderRef.id}\`\n\n` +
-                `*Items:*\n${restItemLines}\n\n` +
+                `🛒 <b>New Order Received!</b>\n` +
+                `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
+                `<b>Items:</b>\n${restItemLines}\n\n` +
                 `Subtotal: ₹${restSubtotal}\n\n` +
                 `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}`;
 
@@ -408,19 +439,19 @@ export default function Checkout() {
       if (pickupDropDetails && pickupDropPartner?.telegramChatId && botToken) {
         try {
           const pickupDropMsg =
-            `🛵 *New Pickup & Drop Assignment!*\n` +
-            `Order ID: \`${orderRef.id}\`\n\n` +
-            `From: ${pickupDropDetails.pickupLocationName}  ₹${pickupDropDetails.pickupCharge}\n` +
-            `To: ${pickupDropDetails.dropLocationName}  ₹${pickupDropDetails.dropCharge}\n\n` +
-            `*Total Charge: ₹${pickupDropDetails.totalCharge}*\n` +
-            `*Commission: ₹${pickupDropDetails.partnerEarning}*\n` +
+            `🛵 <b>New Pickup & Drop Assignment!</b>\n` +
+            `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
+            `From: ${escapeHtml(pickupDropDetails.pickupLocationName)}  ₹${pickupDropDetails.pickupCharge}\n` +
+            `To: ${escapeHtml(pickupDropDetails.dropLocationName)}  ₹${pickupDropDetails.dropCharge}\n\n` +
+            `<b>Total Charge: ₹${pickupDropDetails.totalCharge}</b>\n` +
+            `<b>Commission: ₹${pickupDropDetails.partnerEarning}</b>\n` +
             `Pickup commission: ₹${pickupDropDetails.pickupCommissionFlat}\n` +
             `Drop commission: ₹${pickupDropDetails.dropCommissionFlat}\n\n` +
             `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
-            `Address details: ${address.trim()}\n` +
-            `${pickupDropDetails.note ? `Note: ${pickupDropDetails.note}\n` : ''}` +
-            `Customer: ${user.displayName ?? user.email}\n` +
-            `Mobile: ${mobile.trim()}`;
+            `Address details: ${escapeHtml(address.trim())}\n` +
+            `${pickupDropDetails.note ? `Note: ${escapeHtml(pickupDropDetails.note)}\n` : ''}` +
+            `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
+            `Mobile: ${escapeHtml(mobile.trim())}`;
 
           await sendTelegram(pickupDropPartner.telegramChatId, pickupDropMsg);
         } catch (tgErr) {
@@ -435,16 +466,16 @@ export default function Checkout() {
           const partnerChatId = partnerSnap.exists() ? partnerSnap.data().telegramChatId : null;
           if (partnerChatId) {
             const partnerMsg =
-              `🛵 *New Delivery Assignment!*\n` +
-              `Order ID: \`${orderRef.id}\`\n\n` +
-              `*Items:*\n${itemLines}\n\n` +
+              `🛵 <b>New Delivery Assignment!</b>\n` +
+              `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
+              `<b>Items:</b>\n${itemLines}\n\n` +
               `Subtotal: ₹${totalPrice}\n` +
               `Delivery: ₹${deliveryCharge}\n` +
-              `*Total: ₹${totalPrice + deliveryCharge}*\n\n` +
+              `<b>Total: ₹${totalPrice + deliveryCharge}</b>\n\n` +
               `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
-              `Address: ${address.trim()}\n` +
-              `Customer: ${user.displayName ?? user.email}\n` +
-              `Mobile: ${mobile.trim()}`;
+              `Address: ${escapeHtml(address.trim())}\n` +
+              `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
+              `Mobile: ${escapeHtml(mobile.trim())}`;
 
             await sendTelegram(partnerChatId, partnerMsg);
           }
