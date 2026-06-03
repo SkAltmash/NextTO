@@ -12,22 +12,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import toast from 'react-hot-toast';
 
-// ── Cloudinary ────────────────────────────────────────────────────────────────
-const CLOUD_NAME = 'ddvxbfyik';
-const UPLOAD_PRESET = 'uplode';
-
-async function uploadToCloudinary(file) {
-  const form = new FormData();
-  form.append('file', file);
-  form.append('upload_preset', UPLOAD_PRESET);
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-    { method: 'POST', body: form }
-  );
-  if (!res.ok) throw new Error('Upload failed');
-  return (await res.json()).secure_url;
-}
-
 /* ─── service tabs ─── */
 const SERVICE_TABS = [
   { id: 'food', label: 'Food', icon: UtensilsCrossed, color: 'orange' },
@@ -35,144 +19,6 @@ const SERVICE_TABS = [
   { id: 'medicine', label: 'Medicine', icon: Pill, color: 'blue' },
   { id: 'pickup', label: 'Pickup & Drop', icon: Bike, color: 'purple' },
 ];
-
-/* ─────────────────────────────────────────────
-   MEDICINE — PRESCRIPTION BANNER
-───────────────────────────────────────────── */
-function MedicinePrescriptionBanner() {
-  const { prescriptionImageUrl, setPrescriptionImageUrl } = useCart();
-  const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState(prescriptionImageUrl || '');
-  const inputRef = useRef(null);
-
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const localPrev = URL.createObjectURL(file);
-    setPreview(localPrev);
-    setUploading(true);
-    try {
-      const url = await uploadToCloudinary(file);
-      setPrescriptionImageUrl(url);
-      setPreview(url);
-      toast.success('Prescription uploaded! 💾');
-    } catch {
-      toast.error('Upload failed. Try again.');
-      setPreview('');
-      setPrescriptionImageUrl('');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleClear = () => {
-    setPreview('');
-    setPrescriptionImageUrl('');
-    if (inputRef.current) inputRef.current.value = '';
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mb-6"
-    >
-      {/* Hero banner */}
-      <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-3xl p-5 mb-4 text-white shadow-xl shadow-blue-500/25 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-32 h-32 bg-white/5 rounded-full -translate-y-8 translate-x-8" />
-        <div className="absolute right-8 bottom-0 w-20 h-20 bg-white/5 rounded-full translate-y-6" />
-        <div className="flex items-start gap-4 relative z-10">
-          <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
-            <Pill size={22} />
-          </div>
-          <div>
-            <h2 className="text-base font-black">Medicine Delivery</h2>
-            <p className="text-blue-100 text-xs font-semibold mt-0.5 leading-relaxed">
-              Upload your prescription to order medicines. Our team will verify and deliver.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Upload card */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <FileImage size={15} className="text-blue-500" />
-          <h3 className="font-black text-slate-900 text-sm">Upload Prescription</h3>
-          <span className="ml-auto text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Optional</span>
-        </div>
-
-        <AnimatePresence mode="wait">
-          {!preview ? (
-            <motion.label
-              key="upload"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              htmlFor="rx-upload"
-              className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-blue-200 hover:border-blue-400 bg-blue-50/40 hover:bg-blue-50 rounded-2xl py-8 cursor-pointer transition-all group"
-            >
-              <div className="w-14 h-14 rounded-2xl bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center transition-colors">
-                {uploading
-                  ? <Loader2 size={24} className="text-blue-500 animate-spin" />
-                  : <ImagePlus size={24} className="text-blue-500" />}
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-black text-slate-700 group-hover:text-blue-600 transition-colors">
-                  {uploading ? 'Uploading…' : 'Tap to upload prescription'}
-                </p>
-                <p className="text-xs text-slate-400 font-semibold mt-0.5">JPG, PNG, PDF image · Max 10 MB</p>
-              </div>
-              <input
-                id="rx-upload"
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFile}
-                disabled={uploading}
-              />
-            </motion.label>
-          ) : (
-            <motion.div
-              key="preview"
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="relative rounded-2xl overflow-hidden border-2 border-blue-200"
-            >
-              <img
-                src={preview}
-                alt="Prescription"
-                className="w-full max-h-52 object-contain bg-slate-50"
-              />
-              {uploading && (
-                <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                  <Loader2 size={28} className="text-blue-500 animate-spin" />
-                </div>
-              )}
-              {!uploading && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleClear}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-xl bg-black/60 hover:bg-red-500 flex items-center justify-center text-white transition-colors cursor-pointer"
-                  >
-                    <XIcon size={15} />
-                  </button>
-                  <div className="px-4 py-2.5 bg-blue-50 border-t border-blue-100 flex items-center gap-2">
-                    <CheckCircle2 size={13} className="text-blue-500 shrink-0" />
-                    <p className="text-xs font-bold text-blue-700">Prescription attached to your order</p>
-                  </div>
-                </>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
-  );
-}
 
 const TAB_COLORS = {
   orange: { active: 'bg-orange-500 text-white shadow-orange-500/25', inactive: 'bg-white border border-slate-200 text-slate-600 hover:border-orange-300' },
@@ -381,7 +227,7 @@ function LocationSelect({ label, icon: Icon, locations, value, onChange, exclude
    PICKUP & DROP FORM
 ═══════════════════════════════════════════ */
 function PickupDropForm() {
-  const { setPickupOrderData, pickupOrderData, hasDeliveryItems, cart, prescriptionImageUrl } = useCart();
+  const { setPickupOrderData, pickupOrderData, hasDeliveryItems, cart } = useCart();
   const [locations, setLocations] = useState([]);
   const [locLoading, setLocLoading] = useState(true);
   const [pickupLoc, setPickupLoc] = useState(null);
@@ -504,7 +350,7 @@ function PickupDropForm() {
           <div>
             <p className="font-black text-amber-800 text-sm">Cart has delivery items</p>
             <p className="text-amber-600 text-xs font-semibold mt-0.5 leading-relaxed">
-              You have {cart.length > 0 ? `${cart.length} item${cart.length !== 1 ? 's' : ''}` : ''}{cart.length > 0 && prescriptionImageUrl ? ' + ' : ''}{prescriptionImageUrl ? 'a prescription' : ''} in your cart.
+              You have {cart.length > 0 ? `${cart.length} item${cart.length !== 1 ? 's' : ''}` : ''} in your cart.
               Pickup & Drop cannot be combined with food, grocery, or medicine orders.
               Please clear your cart first.
             </p>
@@ -676,20 +522,15 @@ export default function Product() {
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ duration: 0.22 }}
               >
-                {/* Prescription banner — always visible on medicine tab */}
-                {activeTab === 'medicine' && <MedicinePrescriptionBanner />}
-
                 {filteredProducts.length === 0 ? (
-                  activeTab !== 'medicine' && (
-                    <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
-                      <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center">
-                        <currentTab.icon size={28} className="text-slate-400" />
-                      </div>
-                      <p className="text-slate-400 font-semibold">
-                        No {currentTab?.label} items available yet.
-                      </p>
+                  <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
+                    <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center">
+                      <currentTab.icon size={28} className="text-slate-400" />
                     </div>
-                  )
+                    <p className="text-slate-400 font-semibold">
+                      No {currentTab?.label} items available yet.
+                    </p>
+                  </div>
                 ) : (
                   <>
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-4">

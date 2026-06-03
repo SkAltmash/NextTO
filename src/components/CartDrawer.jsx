@@ -9,14 +9,12 @@ import { useNavigate } from 'react-router-dom';
 export default function CartDrawer({ open, onClose }) {
   const {
     cart, updateQty, clearCart, totalItems, totalPrice,
-    prescriptionImageUrl, setPrescriptionImageUrl,
     pickupOrderData, setPickupOrderData
   } = useCart();
   const navigate = useNavigate();
 
-  const hasPrescription = !!prescriptionImageUrl;
   const hasPickup = !!pickupOrderData;
-  const hasAnything = cart.length > 0 || hasPrescription || hasPickup;
+  const hasAnything = cart.length > 0 || hasPickup;
   const pickupTotal = Number(pickupOrderData?.totalCharge ?? 0);
   const payableTotal = totalPrice + pickupTotal;
 
@@ -55,7 +53,7 @@ export default function CartDrawer({ open, onClose }) {
                 <h2 className="font-black text-slate-900 text-lg">Your Cart</h2>
                 {hasAnything && (
                   <span className="bg-orange-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
-                    {totalItems + (hasPrescription ? 1 : 0)}
+                    {totalItems}
                   </span>
                 )}
               </div>
@@ -144,44 +142,7 @@ export default function CartDrawer({ open, onClose }) {
                     </motion.div>
                   )}
 
-                  {/* ── Prescription card ── */}
-                  {hasPrescription && (
-                    <motion.div
-                      key="prescription"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20, height: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="relative rounded-2xl overflow-hidden border-2 border-blue-200 bg-blue-50"
-                    >
-                      {/* Header row */}
-                      <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
-                        <div className="w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center shrink-0">
-                          <Pill size={15} className="text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-black text-blue-800 text-sm">Prescription Order</p>
-                          <p className="text-blue-500 text-[11px] font-semibold">Price will be confirmed by pharmacist</p>
-                        </div>
-                        <button
-                          onClick={() => setPrescriptionImageUrl('')}
-                          className="w-7 h-7 rounded-lg bg-blue-200 hover:bg-red-100 hover:text-red-500 flex items-center justify-center text-blue-600 transition-all cursor-pointer shrink-0"
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                      {/* Prescription thumbnail */}
-                      <img
-                        src={prescriptionImageUrl}
-                        alt="Prescription"
-                        className="w-full max-h-32 object-contain bg-white border-t border-blue-100"
-                      />
-                      <div className="px-3 py-2 flex items-center gap-1.5">
-                        <FileImage size={12} className="text-blue-400" />
-                        <p className="text-[11px] font-semibold text-blue-600">Prescription image attached</p>
-                      </div>
-                    </motion.div>
-                  )}
+
 
                   {/* ── Regular cart items ── */}
                   {cart.map((item) => {
@@ -260,11 +221,7 @@ export default function CartDrawer({ open, onClose }) {
                     <span className="font-black text-slate-900 text-xl">₹{payableTotal}</span>
                   </div>
                 )}
-                {hasPrescription && cart.length === 0 && !hasPickup && (
-                  <p className="text-blue-500 text-xs font-semibold text-center">
-                    💊 Prescription order · price confirmed on delivery
-                  </p>
-                )}
+
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}

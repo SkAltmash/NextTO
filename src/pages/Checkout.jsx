@@ -103,7 +103,7 @@ function SummaryItem({ item }) {
 
 // ─── Main Checkout Page ───────────────────────────────────────────────────────
 export default function Checkout() {
-  const { cart, totalPrice, clearCart, prescriptionImageUrl, pickupOrderData } = useCart();
+  const { cart, totalPrice, clearCart, pickupOrderData } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -115,10 +115,10 @@ export default function Checkout() {
   const [placing, setPlacing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cod');
 
-  // Redirect if cart is empty AND no prescription/pickup-drop request
+  // Redirect if cart is empty AND no pickup-drop request
   useEffect(() => {
-    if (cart.length === 0 && !prescriptionImageUrl && !pickupOrderData) navigate('/product', { replace: true });
-  }, [cart, prescriptionImageUrl, pickupOrderData, navigate]);
+    if (cart.length === 0 && !pickupOrderData) navigate('/product', { replace: true });
+  }, [cart, pickupOrderData, navigate]);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -150,15 +150,13 @@ export default function Checkout() {
   }, []);
 
   const isPickupDropOrder = !!pickupOrderData;
-  const isPrescriptionOrder = cart.length === 0 && !!prescriptionImageUrl && !isPickupDropOrder;
-  const needsDeliveryArea = cart.length > 0 || isPrescriptionOrder;
+  const needsDeliveryArea = cart.length > 0;
 
   const pickupDropCharge = Number(pickupOrderData?.totalCharge ?? 0);
   const deliveryCharge = Number(selectedLoc?.deliveryCharge ?? 0);
-  const totalAmount = isPrescriptionOrder ? 0 : totalPrice + (needsDeliveryArea ? deliveryCharge : 0) + pickupDropCharge;
+  const totalAmount = totalPrice + (needsDeliveryArea ? deliveryCharge : 0) + pickupDropCharge;
 
   const belowMin =
-    !isPrescriptionOrder &&
     cart.length > 0 &&
     selectedLoc && totalPrice < (selectedLoc.minOrder ?? 0);
 
@@ -166,7 +164,7 @@ export default function Checkout() {
     (!needsDeliveryArea || selectedLoc) &&
     address.trim().length > 0 &&
     mobile.trim().length >= 10 &&
-    (isPrescriptionOrder || paymentMethod === 'cod') &&
+    paymentMethod === 'cod' &&
     !belowMin &&
     !placing;
 
@@ -191,7 +189,11 @@ export default function Checkout() {
       // ── Delivery Partner from selected delivery area ────────────────────────
       const selectedDeliveryPartnerId = selectedLoc?.assignedPartnerId ?? '';
       const selectedDeliveryPartnerName = selectedLoc?.assignedPartnerName ?? '';
-      const selectedDeliveryPartnerEarning = selectedLoc?.deliveryPartnerEarning ?? 0;
+      let selectedDeliveryPartnerEarning = 0;
+      if (selectedDeliveryPartnerId) {
+        const partner = await getPartner(selectedDeliveryPartnerId);
+        selectedDeliveryPartnerEarning = numberValue(partner?.commissionFlat);
+      }
 
       // ── Pickup & Drop partner commission from deliveryPartners ─────────────
       let pickupDropDetails = null;
@@ -253,6 +255,18 @@ export default function Checkout() {
 
       // Unique restaurant IDs across all cart items (for admin reference)
       const restaurantIds = [...new Set(cart.map((i) => i.restaurantId).filter(Boolean))];
+      let restaurantPhone = '';
+      if (restaurantIds.length > 0) {
+        try {
+          const restSnap = await getDoc(doc(db, 'restaurants', restaurantIds[0]));
+          if (restSnap.exists()) {
+            restaurantPhone = restSnap.data().phone ?? '';
+          }
+        } catch (err) {
+          console.warn('Error fetching restaurant phone:', err);
+        }
+      }
+
       const pickupDropItem = pickupDropDetails
         ? [{
           productId: 'pickup-drop',
@@ -272,26 +286,21 @@ export default function Checkout() {
           price: i.discountPrice ?? i.price,
           image: i.images?.[0] ?? '',
           restaurantId: i.restaurantId ?? '',
+          restaurantPhone: i.restaurantId ? restaurantPhone : '',
         })),
         ...pickupDropItem,
       ];
-      const subtotal = isPrescriptionOrder
-        ? 0
-        : totalPrice + (pickupDropDetails?.totalCharge ?? 0);
-      const orderDeliveryCharge = isPrescriptionOrder
-        ? 0
-        : needsDeliveryArea ? deliveryCharge : 0;
-      const finalTotalAmount = isPrescriptionOrder ? 0 : subtotal + orderDeliveryCharge;
+      const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
+      const orderDeliveryCharge = needsDeliveryArea ? deliveryCharge : 0;
+      const finalTotalAmount = subtotal + orderDeliveryCharge;
 
       const orderRef = await addDoc(collection(db, 'orders'), {
         // Order type
-        isPrescriptionOrder,
+        isPrescriptionOrder: false,
         isPickupDropOrder: !!pickupDropDetails,
-        orderType: isPrescriptionOrder
-          ? 'prescription'
-          : pickupDropDetails
-            ? 'pickup_drop'
-            : 'regular',
+        orderType: pickupDropDetails
+          ? 'pickup_drop'
+          : 'regular',
 
         // User
         userId: user.uid,
@@ -301,9 +310,10 @@ export default function Checkout() {
 
         // Restaurants involved
         restaurantIds,
-        prescriptionImageUrl: prescriptionImageUrl ?? '',
+        prescriptionImageUrl: '',
         restaurantId: restaurantIds[0] ?? '',
         restaurantName: cart.find((i) => i.restaurantId === restaurantIds[0])?.restaurantName ?? '',
+        restaurantPhone: restaurantPhone ?? '',
 
         // Items
         items: orderItems,
@@ -326,7 +336,7 @@ export default function Checkout() {
         totalAmount: finalTotalAmount,
 
         // Payment
-        paymentMethod: isPrescriptionOrder ? 'cod' : paymentMethod,
+        paymentMethod: paymentMethod,
 
         // Status
         status: 'pending',
@@ -354,8 +364,8 @@ export default function Checkout() {
         });
       };
 
-      // 1️⃣  Restaurants — skip for prescription orders
-      if (!isPrescriptionOrder && botToken && restaurantIds.length > 0) {
+      // 1️⃣  Restaurants
+      if (botToken && restaurantIds.length > 0) {
         const byRestaurant = cart.reduce((acc, item) => {
           const rId = item.restaurantId;
           if (!rId) return acc;
@@ -419,37 +429,22 @@ export default function Checkout() {
       }
 
       // 3️⃣  Delivery partner
-      if ((cart.length > 0 || isPrescriptionOrder) && deliveryPartnerId && botToken) {
+      if (cart.length > 0 && deliveryPartnerId && botToken) {
         try {
           const partnerSnap = await getDoc(doc(db, 'deliveryPartners', deliveryPartnerId));
           const partnerChatId = partnerSnap.exists() ? partnerSnap.data().telegramChatId : null;
           if (partnerChatId) {
-            let partnerMsg;
-
-            if (isPrescriptionOrder) {
-              // Prescription order — no price/MRP
-              partnerMsg =
-                `💊 *New Prescription Order!*\n` +
-                `Order ID: \`${orderRef.id}\`\n\n` +
-                `📋 Prescription image attached — collect medicines from pharmacy\n\n` +
-                `Payment: Cash on Delivery (price TBD)\n` +
-                `Address: ${address.trim()}\n` +
-                `Customer: ${user.displayName ?? user.email}\n` +
-                `Mobile: ${mobile.trim()}`;
-            } else {
-              // Regular order — full details
-              partnerMsg =
-                `🛵 *New Delivery Assignment!*\n` +
-                `Order ID: \`${orderRef.id}\`\n\n` +
-                `*Items:*\n${itemLines}\n\n` +
-                `Subtotal: ₹${totalPrice}\n` +
-                `Delivery: ₹${deliveryCharge}\n` +
-                `*Total: ₹${totalPrice + deliveryCharge}*\n\n` +
-                `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
-                `Address: ${address.trim()}\n` +
-                `Customer: ${user.displayName ?? user.email}\n` +
-                `Mobile: ${mobile.trim()}`;
-            }
+            const partnerMsg =
+              `🛵 *New Delivery Assignment!*\n` +
+              `Order ID: \`${orderRef.id}\`\n\n` +
+              `*Items:*\n${itemLines}\n\n` +
+              `Subtotal: ₹${totalPrice}\n` +
+              `Delivery: ₹${deliveryCharge}\n` +
+              `*Total: ₹${totalPrice + deliveryCharge}*\n\n` +
+              `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
+              `Address: ${address.trim()}\n` +
+              `Customer: ${user.displayName ?? user.email}\n` +
+              `Mobile: ${mobile.trim()}`;
 
             await sendTelegram(partnerChatId, partnerMsg);
           }
@@ -494,68 +489,38 @@ export default function Checkout() {
             <ShoppingBag size={17} className="text-orange-500" />
             <h2 className="font-black text-slate-900 text-sm">Order Summary</h2>
             <span className="ml-auto text-xs font-black text-slate-400">
-              {isPrescriptionOrder
-                ? 'Prescription Order'
-                : `${cart.length + (isPickupDropOrder ? 1 : 0)} item${cart.length + (isPickupDropOrder ? 1 : 0) !== 1 ? 's' : ''}`}
+              {`${cart.length + (isPickupDropOrder ? 1 : 0)} item${cart.length + (isPickupDropOrder ? 1 : 0) !== 1 ? 's' : ''}`}
             </span>
           </div>
 
-          {isPrescriptionOrder ? (
-            /* Prescription-only order UI */
-            <div className="px-5 py-5 flex flex-col items-center gap-3 text-center">
-              <img
-                src={prescriptionImageUrl}
-                alt="Prescription"
-                className="w-full max-h-44 object-contain rounded-2xl border border-blue-100 bg-blue-50"
-              />
-              <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 w-full text-left">
-                <p className="text-xs font-black text-blue-700 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-400" />
-                  Prescription attached
-                </p>
-                <p className="text-[11px] text-blue-500 font-semibold mt-0.5">
-                  Price will be confirmed by the pharmacist at delivery
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="px-5 py-4 space-y-4">
-                {cart.map((item) => (
-                  <SummaryItem key={item.id} item={item} />
-                ))}
-                {isPickupDropOrder && (
-                  <div className="rounded-2xl border border-purple-100 bg-purple-50 px-4 py-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-purple-500 flex items-center justify-center text-white shrink-0">
-                        <Bike size={16} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-black text-purple-900 text-sm">Pickup &amp; Drop</p>
-                        <p className="text-purple-500 text-xs font-semibold">₹{pickupDropCharge}</p>
-                      </div>
-                    </div>
-                    <div className="grid gap-1.5 pl-0.5">
-                      <p className="flex items-center gap-2 text-xs font-bold text-purple-700">
-                        <Navigation size={12} className="text-purple-400 shrink-0" />
-                        <span className="truncate">From: {pickupOrderData.pickupLoc?.name}</span>
-                      </p>
-                      <p className="flex items-center gap-2 text-xs font-bold text-purple-700">
-                        <MapPin size={12} className="text-purple-400 shrink-0" />
-                        <span className="truncate">To: {pickupOrderData.dropLoc?.name}</span>
-                      </p>
-                    </div>
+          <div className="px-5 py-4 space-y-4">
+            {cart.map((item) => (
+              <SummaryItem key={item.id} item={item} />
+            ))}
+            {isPickupDropOrder && (
+              <div className="rounded-2xl border border-purple-100 bg-purple-50 px-4 py-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500 flex items-center justify-center text-white shrink-0">
+                    <Bike size={16} />
                   </div>
-                )}
-              </div>
-              {prescriptionImageUrl && (
-                <div className="mx-5 mb-4 flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-600 px-3 py-2 rounded-xl text-xs font-bold">
-                  <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                  Prescription attached · will be sent with order
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-purple-900 text-sm">Pickup &amp; Drop</p>
+                    <p className="text-purple-500 text-xs font-semibold">₹{pickupDropCharge}</p>
+                  </div>
                 </div>
-              )}
-            </>
-          )}
+                <div className="grid gap-1.5 pl-0.5">
+                  <p className="flex items-center gap-2 text-xs font-bold text-purple-700">
+                    <Navigation size={12} className="text-purple-400 shrink-0" />
+                    <span className="truncate">From: {pickupOrderData.pickupLoc?.name}</span>
+                  </p>
+                  <p className="flex items-center gap-2 text-xs font-bold text-purple-700">
+                    <MapPin size={12} className="text-purple-400 shrink-0" />
+                    <span className="truncate">To: {pickupOrderData.dropLoc?.name}</span>
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Delivery Location / Pickup Route ── */}
@@ -667,42 +632,40 @@ export default function Checkout() {
         </div>
 
         {/* ── Price Breakdown ── */}
-        {!isPrescriptionOrder && (
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
-            <div className="flex items-center gap-2.5 mb-4">
-              <Tag size={17} className="text-orange-500" />
-              <h2 className="font-black text-slate-900 text-sm">Bill Details</h2>
-            </div>
-            <div className="space-y-2.5">
-              {cart.length > 0 && (
-                <div className="flex justify-between text-sm font-semibold text-slate-500">
-                  <span>Item total</span>
-                  <span>₹{totalPrice}</span>
-                </div>
-              )}
-              {isPickupDropOrder && (
-                <div className="flex justify-between text-sm font-semibold text-slate-500">
-                  <span>Pickup &amp; Drop</span>
-                  <span className="text-purple-600 font-bold">₹{pickupDropCharge}</span>
-                </div>
-              )}
-              {needsDeliveryArea && (
-                <div className="flex justify-between text-sm font-semibold text-slate-500">
-                  <span>Delivery charge</span>
-                  {selectedLoc ? (
-                    <span className="text-orange-500 font-bold">₹{deliveryCharge}</span>
-                  ) : (
-                    <span className="text-slate-300">— select area</span>
-                  )}
-                </div>
-              )}
-              <div className="border-t border-slate-100 pt-2.5 flex justify-between font-black text-slate-900 text-base">
-                <span>To Pay</span>
-                <span>₹{totalAmount}</span>
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+          <div className="flex items-center gap-2.5 mb-4">
+            <Tag size={17} className="text-orange-500" />
+            <h2 className="font-black text-slate-900 text-sm">Bill Details</h2>
+          </div>
+          <div className="space-y-2.5">
+            {cart.length > 0 && (
+              <div className="flex justify-between text-sm font-semibold text-slate-500">
+                <span>Item total</span>
+                <span>₹{totalPrice}</span>
               </div>
+            )}
+            {isPickupDropOrder && (
+              <div className="flex justify-between text-sm font-semibold text-slate-500">
+                <span>Pickup &amp; Drop</span>
+                <span className="text-purple-600 font-bold">₹{pickupDropCharge}</span>
+              </div>
+            )}
+            {needsDeliveryArea && (
+              <div className="flex justify-between text-sm font-semibold text-slate-500">
+                <span>Delivery charge</span>
+                {selectedLoc ? (
+                  <span className="text-orange-500 font-bold">₹{deliveryCharge}</span>
+                ) : (
+                  <span className="text-slate-300">— select area</span>
+                )}
+              </div>
+            )}
+            <div className="border-t border-slate-100 pt-2.5 flex justify-between font-black text-slate-900 text-base">
+              <span>To Pay</span>
+              <span>₹{totalAmount}</span>
             </div>
           </div>
-        )}
+        </div>
 
         {/* ── Payment Method ── */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">

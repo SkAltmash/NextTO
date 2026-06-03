@@ -52,9 +52,6 @@ export function CartProvider({ children }) {
     }
   });
 
-  // Prescription image URL (for medicine orders)
-  const [prescriptionImageUrl, setPrescriptionImageUrl] = useState('');
-
   // Persist to localStorage on every change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
@@ -68,8 +65,8 @@ export function CartProvider({ children }) {
     }
   }, [pickupOrderData]);
 
-  // ── Cart has delivery-type items (food/grocery/medicine/prescription) ──
-  const hasDeliveryItems = cart.length > 0 || !!prescriptionImageUrl;
+  // ── Cart has delivery-type items (food/grocery/medicine) ──
+  const hasDeliveryItems = cart.length > 0;
 
   // ── Guarded addToCart: block if Pickup & Drop is in cart ──
   const addToCart = useCallback((item) => {
@@ -84,7 +81,6 @@ export function CartProvider({ children }) {
   const updateQty    = (id, qty) => dispatch({ type: 'UPDATE_QTY', id, qty });
   const clearCart    = () => {
     dispatch({ type: 'CLEAR' });
-    setPrescriptionImageUrl('');
     setPickupOrderDataRaw(null);
   };
 
@@ -96,15 +92,6 @@ export function CartProvider({ children }) {
     }
     setPickupOrderDataRaw(data);
   }, [hasDeliveryItems]);
-
-  // ── Guarded setPrescription: block if pickup in cart ──
-  const setGuardedPrescriptionImageUrl = useCallback((url) => {
-    if (url && pickupOrderData) {
-      toast.error('Remove Pickup & Drop from cart first to upload prescription', { id: 'cart-conflict' });
-      return;
-    }
-    setPrescriptionImageUrl(url);
-  }, [pickupOrderData]);
 
   const FAV_STORAGE_KEY = 'fe_favorites';
   const [favorites, setFavorites] = useState(() => {
@@ -146,7 +133,6 @@ export function CartProvider({ children }) {
   return (
     <CartContext.Provider
       value={{ cart, addToCart, removeFromCart, updateQty, clearCart, totalItems, totalPrice,
-               prescriptionImageUrl, setPrescriptionImageUrl: setGuardedPrescriptionImageUrl,
                pickupOrderData, setPickupOrderData,
                hasDeliveryItems,
                favorites, toggleFavorite, isFavorite }}

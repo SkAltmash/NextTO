@@ -339,40 +339,13 @@ export default function OrderDetail() {
           {order?.restaurantName && (
             <InfoRow icon={Store} label="Restaurant" value={order.restaurantName} />
           )}
+          {order?.restaurantPhone && (
+            <InfoRow icon={Phone} label="Restaurant Phone" value={order.restaurantPhone} />
+          )}
           <InfoRow icon={Clock} label="Ordered On" value={date} />
           <InfoRow icon={ClipboardList} label="Order ID" value={id} mono />
         </motion.div>
 
-        {/* ── Prescription Image ── */}
-        {order?.prescriptionImageUrl && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden"
-          >
-            <div className="px-5 py-4 border-b border-slate-50 flex items-center gap-2">
-              <FileImage size={15} className="text-orange-500" />
-              <h2 className="font-black text-slate-900 text-sm">Prescription Image</h2>
-            </div>
-            <a
-              href={order.prescriptionImageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block"
-            >
-              <img
-                src={order.prescriptionImageUrl}
-                alt="Prescription"
-                className="w-full max-h-72 object-contain bg-slate-50 hover:opacity-90 transition-opacity"
-              />
-              <div className="px-5 py-3 flex items-center gap-2 text-xs font-bold text-orange-500">
-                <FileImage size={13} />
-                Tap to view full image
-              </div>
-            </a>
-          </motion.div>
-        )}
 
       </div>
     </div>
