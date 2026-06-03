@@ -269,6 +269,7 @@ export default function Checkout() {
               restaurantDataMap[snap.id] = {
                 name: d.name ?? '',
                 phone: d.phone ?? '',
+                logo: d.logo ?? '',
                 commissionRate: Number(d.commissionRate ?? 0),
               };
             }
@@ -279,9 +280,10 @@ export default function Checkout() {
       }
 
       // Keep the first restaurant's top-level fields for backward compat
-      const firstRestData = restaurantDataMap[restaurantIds[0]] ?? { name: '', phone: '', commissionRate: 0 };
+      const firstRestData = restaurantDataMap[restaurantIds[0]] ?? { name: '', phone: '', logo: '', commissionRate: 0 };
       const restaurantPhone = firstRestData.phone;
       const restaurantName = firstRestData.name;
+      const restaurantLogo = firstRestData.logo;
 
       const pickupDropItem = pickupDropDetails
         ? [{
@@ -306,8 +308,11 @@ export default function Checkout() {
             price: i.discountPrice ?? i.price,
             image: i.images?.[0] ?? '',
             restaurantId: i.restaurantId ?? '',
+            restaurantName: rData ? rData.name : '',
+            restaurantLogo: rData ? rData.logo : '',
             restaurantPhone: rData ? rData.phone : '',
             commissionRate: rData ? rData.commissionRate : 0,
+            deliveryArea: selectedLoc?.name ?? '',
           };
         }),
         ...pickupDropItem,
@@ -336,6 +341,7 @@ export default function Checkout() {
         prescriptionImageUrl: '',
         restaurantId: restaurantIds[0] ?? '',
         restaurantName,
+        restaurantLogo,
         restaurantPhone,
 
         // Items
@@ -349,6 +355,7 @@ export default function Checkout() {
         address: address.trim(),
         locationId: selectedLoc?.id ?? '',
         locationName: selectedLoc?.name ?? '',
+        deliveryArea: selectedLoc?.name ?? '',
         deliveryCharge: orderDeliveryCharge,
         deliveryPartnerId,
         deliveryPartnerName,
