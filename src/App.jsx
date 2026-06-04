@@ -7,7 +7,6 @@ import Home from './pages/Home';
 import Product from './pages/Product';
 import Order from './pages/Order';
 import Me from './pages/Me';
-import Search from './pages/Search';
 import Favorites from './pages/Favorites';
 import Auth from './pages/Auth';
 import ProductDetail from './pages/ProductDetail';
@@ -15,6 +14,8 @@ import RestaurantDetail from './pages/RestaurantDetail';
 import Restaurants from './pages/Restaurants';
 import Checkout from './pages/Checkout';
 import OrderDetail from './pages/OrderDetail';
+import Categories from './pages/Categories';
+import CategoryDetail from './pages/CategoryDetail';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 
@@ -24,14 +25,15 @@ function AppLayout() {
 
   const isAuth = pathname === '/auth';
   const noMobilePad = pathname === '/product'
-    || pathname === '/search'
     || pathname === '/restaurants'
     || pathname === '/checkout'
     || pathname === '/order'
     || pathname === '/favorites'
+    || pathname === '/categories'
     || pathname.startsWith('/order/')
     || pathname.startsWith('/restaurant/')
-    || pathname.startsWith('/product/');
+    || pathname.startsWith('/product/')
+    || pathname.startsWith('/categories/');
 
   // /auth        → no padding at all (full screen)
   // noMobilePad  → no mobile top gap (page handles own layout), keep desktop
@@ -65,7 +67,6 @@ function AppLayout() {
           <Route path="/product" element={<Product />} />
           <Route path="/order" element={<Order />} />
           <Route path="/me" element={<Me />} />
-          <Route path="/search" element={<Search />} />
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/product/:id" element={<ProductDetail />} />
@@ -73,6 +74,8 @@ function AppLayout() {
           <Route path="/restaurant/:id" element={<RestaurantDetail />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/order/:id" element={<OrderDetail />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/categories/:id" element={<CategoryDetail />} />
         </Routes>
       </main>
     </>

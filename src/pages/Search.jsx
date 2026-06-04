@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search as SearchIcon, X, Flame, UtensilsCrossed,
-  Clock, MapPin, ChevronRight, Loader2, Plus, Minus, CheckCircle2, Package, MessageSquare, Heart
+  Clock, MapPin, ChevronRight, Loader2, Plus, Minus, CheckCircle2, Package, MessageSquare, Heart, LayoutGrid
 } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
@@ -109,7 +109,38 @@ function ProductResult({ product }) {
   );
 }
 
-/* ─── restaurant result card ─── */
+/* ─── category result card ─── */
+const CAT_GRADIENT = {
+  food:     'from-orange-400 to-amber-500',
+  medicine: 'from-blue-400 to-cyan-500',
+  grocery:  'from-emerald-400 to-teal-500',
+};
+function CategoryResult({ category }) {
+  const navigate = useNavigate();
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+      onClick={() => navigate(`/categories/${category.id}`)}
+    >
+      <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${CAT_GRADIENT[category.serviceType] ?? 'from-slate-400 to-slate-500'} overflow-hidden shrink-0 flex items-center justify-center`}>
+        {category.image
+          ? <img src={category.image} alt={category.name} className="w-full h-full object-cover" />
+          : <LayoutGrid size={22} className="text-white/80" />
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-black text-slate-900 text-sm truncate">{category.name}</p>
+        {category.serviceType && (
+          <span className="text-[10px] font-black text-slate-400 capitalize">{category.serviceType}</span>
+        )}
+      </div>
+      <ChevronRight size={16} className="text-slate-300 shrink-0" />
+    </motion.div>
+  );
+}
+
 function RestaurantResult({ restaurant }) {
   const navigate = useNavigate();
   return (
@@ -156,7 +187,8 @@ export default function Search() {
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [products, setProducts] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
-  const [allData, setAllData] = useState({ products: [], restaurants: [] });
+  const [categories, setCategories] = useState([]);
+  const [allData, setAllData] = useState({ products: [], restaurants: [], categories: [] });
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
   const inputRef = useRef(null);
@@ -167,13 +199,15 @@ export default function Search() {
     const load = async () => {
       setLoading(true);
       try {
-        const [pSnap, rSnap] = await Promise.all([
+        const [pSnap, rSnap, cSnap] = await Promise.all([
           getDocs(collection(db, 'products')),
           getDocs(collection(db, 'restaurants')),
+          getDocs(collection(db, 'categories')),
         ]);
         const p = pSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
         const r = rSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setAllData({ products: p, restaurants: r });
+        const c = cSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setAllData({ products: p, restaurants: r, categories: c });
       } catch (e) {
         console.error(e);
       } finally {
@@ -188,7 +222,7 @@ export default function Search() {
   /* filter whenever query changes */
   useEffect(() => {
     const q = query.trim().toLowerCase();
-    if (!q) { setProducts([]); setRestaurants([]); return; }
+    if (!q) { setProducts([]); setRestaurants([]); setCategories([]); return; }
     setProducts(allData.products.filter((p) =>
       p.name?.toLowerCase().includes(q) ||
       p.categoryId?.toLowerCase().includes(q) ||
@@ -199,11 +233,15 @@ export default function Search() {
       r.address?.toLowerCase().includes(q) ||
       r.categories?.some((c) => c.toLowerCase().includes(q))
     ));
+    setCategories(allData.categories.filter((c) =>
+      c.name?.toLowerCase().includes(q) ||
+      c.serviceType?.toLowerCase().includes(q)
+    ));
     /* update URL param */
     setSearchParams(q ? { q } : {}, { replace: true });
   }, [query, allData]);
 
-  const hasResults = products.length > 0 || restaurants.length > 0;
+  const hasResults = products.length > 0 || restaurants.length > 0 || categories.length > 0;
   const isSearching = query.trim().length > 0;
 
   return (
@@ -300,6 +338,19 @@ export default function Search() {
         {/* Results */}
         {!loading && isSearching && hasResults && (
           <div className="space-y-6">
+            {/* Categories */}
+            {categories.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <LayoutGrid size={13} className="text-slate-400" />
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Categories ({categories.length})</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {categories.map((c) => <CategoryResult key={c.id} category={c} />)}
+                </div>
+              </div>
+            )}
+
             {/* Products */}
             {products.length > 0 && (
               <div>

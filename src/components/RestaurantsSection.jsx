@@ -5,9 +5,19 @@ import { useNavigate } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
+/* ── Type helpers ── */
+const TYPE_META = {
+  medicine:   { emoji: '💊', label: 'Medicine',   badge: 'bg-blue-50 text-blue-600 border-blue-100' },
+  shop:       { emoji: '🛒', label: 'Shop',       badge: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+  restaurant: { emoji: '🍽️', label: 'Restaurant', badge: 'bg-orange-50 text-orange-600 border-orange-100' },
+};
+const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
+
 /* ─── single restaurant card ─── */
 function RestaurantCard({ restaurant }) {
   const navigate = useNavigate();
+  const meta = getTypeMeta(restaurant.restaurantType);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -34,11 +44,14 @@ function RestaurantCard({ restaurant }) {
           </div>
         )}
         {/* open/closed badge */}
-        <div className={`absolute top-2 right-2 text-[9px] font-black px-2 py-0.5 rounded-full ${restaurant.isOpen
-            ? 'bg-emerald-500 text-white'
-            : 'bg-red-400 text-white'
-          }`}>
+        <div className={`absolute top-2 right-2 text-[9px] font-black px-2 py-0.5 rounded-full ${
+          restaurant.isOpen ? 'bg-emerald-500 text-white' : 'bg-red-400 text-white'
+        }`}>
           {restaurant.isOpen ? 'Open' : 'Closed'}
+        </div>
+        {/* type badge */}
+        <div className={`absolute top-2 left-2 text-[9px] font-black px-2 py-0.5 rounded-full border ${meta.badge}`}>
+          {meta.emoji} {meta.label}
         </div>
       </div>
 
@@ -55,7 +68,7 @@ function RestaurantCard({ restaurant }) {
             {restaurant.deliveryTime ?? 'N/A'}
           </span>
           <span className="text-orange-500 text-[11px] font-bold flex items-center gap-0.5">
-            product <ChevronRight size={11} />
+            Menu <ChevronRight size={11} />
           </span>
         </div>
       </div>
@@ -86,7 +99,7 @@ export function RestaurantsSection() {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-xl font-black text-slate-900">Restaurants</h2>
+            <h2 className="text-xl font-black text-slate-900">Stores</h2>
             <p className="text-slate-400 text-xs font-semibold mt-0.5">Order directly from your favourite places</p>
           </div>
           <button

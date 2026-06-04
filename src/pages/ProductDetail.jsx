@@ -5,14 +5,16 @@ import { db } from '../firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Star, Clock, ShoppingCart, Plus, Minus,
-  Loader2, AlertCircle, CheckCircle2, UtensilsCrossed, MapPin, Bike, Heart
+  Loader2, AlertCircle, CheckCircle2, UtensilsCrossed, MapPin, Bike, Heart, Tag
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useCategories, getCategoryName } from '../hooks/useCategories';
 
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart, cart, updateQty, pickupOrderData, toggleFavorite, isFavorite } = useCart();
+  const { categories } = useCategories();
 
   const [product, setProduct] = useState(null);
   const [restaurant, setRestaurant] = useState(null);
@@ -170,12 +172,20 @@ export default function ProductDetail() {
 
           {/* Info */}
           <div className="space-y-4">
-            {/* Service type badge */}
-            {product?.serviceType && (
-              <span className="inline-block bg-orange-50 text-orange-600 border border-orange-100 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                {product.serviceType}
-              </span>
-            )}
+            {/* Badges row: service type + category */}
+            <div className="flex flex-wrap gap-2">
+              {product?.serviceType && (
+                <span className="inline-block bg-orange-50 text-orange-600 border border-orange-100 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                  {product.serviceType}
+                </span>
+              )}
+              {product?.categoryId && (
+                <span className="inline-flex items-center gap-1 bg-slate-50 text-slate-600 border border-slate-200 text-[10px] font-black px-3 py-1 rounded-full">
+                  <Tag size={9} />
+                  {getCategoryName(categories, product.categoryId)}
+                </span>
+              )}
+            </div>
 
             <h1 className="text-3xl font-black text-slate-900 leading-tight">{product?.name}</h1>
 

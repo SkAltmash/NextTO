@@ -5,7 +5,7 @@ import {
   Plus, Minus, CheckCircle2, ArrowRight, Loader2, Package, Clock, Heart
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, or } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCart } from '../context/CartContext';
 
@@ -225,9 +225,30 @@ export default function ServicesSection() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetch = async () => {
+    if (activeTab === 'pickup') {
+      setLoading(false);
+      return;
+    }
+
+    const fetchTabProducts = async () => {
+      setLoading(true);
       try {
-        const snap = await getDocs(collection(db, 'products'));
+        const constraints = [];
+        if (activeTab === 'food') {
+          constraints.push(
+            or(
+              where('serviceType', '==', 'food'),
+              where('serviceType', '==', ''),
+              where('serviceType', '==', null)
+            )
+          );
+        } else {
+          constraints.push(where('serviceType', '==', activeTab));
+        }
+        constraints.push(limit(6));
+
+        const q = query(collection(db, 'products'), ...constraints);
+        const snap = await getDocs(q);
         setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       } catch (e) {
         console.error(e);
@@ -235,19 +256,12 @@ export default function ServicesSection() {
         setLoading(false);
       }
     };
-    fetch();
-  }, []);
+    fetchTabProducts();
+  }, [activeTab]);
 
   const currentTab = TABS.find((t) => t.id === activeTab);
 
-  const filtered = activeTab === 'pickup'
-    ? []
-    : products
-      .filter((p) => {
-        const st = (p.serviceType ?? '').toLowerCase();
-        return st === activeTab || (activeTab === 'food' && !st);
-      })
-      .slice(0, 6); // max 6 on homepage
+  const filtered = activeTab === 'pickup' ? [] : products;
 
   return (
     <section className="py-14 md:py-20 bg-white">

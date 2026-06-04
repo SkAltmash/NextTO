@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where, or } from 'firebase/firestore';
 import { db } from '../firebase';
 import { ProductCard } from '../pages/Product';
 
@@ -12,13 +12,17 @@ export default function SpecialsSection() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    getDocs(collection(db, 'products'))
+    const q = query(
+      collection(db, 'products'),
+      or(
+        where('isSpecial', '==', true),
+        where('isSpecial', '==', 'true'),
+        where('categoryId', '==', 'curd01')
+      )
+    );
+    getDocs(q)
       .then((snap) => {
-        const allProducts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const specialProducts = allProducts.filter(
-          (p) => p.isSpecial === true || String(p.isSpecial) === 'true' || p.categoryId === 'curd01'
-        );
-        setSpecials(specialProducts);
+        setSpecials(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       })
       .catch((err) => {
         console.error('Error fetching special products:', err);
@@ -60,9 +64,11 @@ export default function SpecialsSection() {
         </div>
 
         {/* Product Cards Grid (4-5 items) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="flex overflow-x-auto pb-4 -mx-4 px-4 gap-4 scrollbar-hide sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:mx-0 sm:px-0 sm:pb-0">
           {specials.slice(0, 5).map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <div key={product.id} className="w-[190px] shrink-0 sm:w-auto">
+              <ProductCard product={product} />
+            </div>
           ))}
         </div>
       </div>

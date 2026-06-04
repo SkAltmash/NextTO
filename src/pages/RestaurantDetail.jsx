@@ -8,6 +8,15 @@ import {
   Loader2, AlertCircle, ShoppingCart, Plus, Minus, Star, CheckCircle2
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useCategories, getCategoryName } from '../hooks/useCategories';
+
+/* ── Restaurant type helpers ── */
+const TYPE_META = {
+  medicine:   { emoji: '💊', label: 'Medicine',   cls: 'bg-blue-50 text-blue-600 border-blue-100' },
+  shop:       { emoji: '🛒', label: 'Shop',       cls: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+  restaurant: { emoji: '🍽️', label: 'Restaurant', cls: 'bg-orange-50 text-orange-600 border-orange-100' },
+};
+const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
 
 function ProductCard({ product }) {
   const { addToCart, cart, updateQty } = useCart();
@@ -110,6 +119,7 @@ function ProductCard({ product }) {
 export default function RestaurantDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { categories } = useCategories();
 
   const [restaurant, setRestaurant] = useState(null);
   const [products, setProducts] = useState([]);
@@ -153,7 +163,7 @@ export default function RestaurantDetail() {
     </div>
   );
 
-  const categories = ['all', ...new Set(products.map((p) => p.categoryId).filter(Boolean))];
+  const categoryIds = ['all', ...new Set(products.map((p) => p.categoryId).filter(Boolean))];
   const filtered = filterCat === 'all' ? products : products.filter((p) => p.categoryId === filterCat);
 
   return (
@@ -203,14 +213,12 @@ export default function RestaurantDetail() {
               <Clock size={14} className="text-orange-400" /> {restaurant.deliveryTime}
             </span>
           )}
-          {restaurant?.phone && (
-            <a
-              href={`tel:${restaurant.phone}`}
-              className="flex items-center gap-1.5 text-orange-500 hover:text-orange-600 cursor-pointer"
-            >
-              <Phone size={14} /> {restaurant.phone}
-            </a>
-          )}
+          {/* Restaurant type badge */}
+          {(() => { const m = getTypeMeta(restaurant?.restaurantType); return (
+            <span className={`flex items-center gap-1 text-[11px] font-black px-3 py-1 rounded-full border ${m.cls}`}>
+              {m.emoji} {m.label}
+            </span>
+          ); })()}
         </div>
 
         {/* Category chips */}
@@ -228,19 +236,19 @@ export default function RestaurantDetail() {
       {/* Products */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Product category filter */}
-        {categories.length > 1 && (
+        {categoryIds.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
-            {categories.map((cat) => (
+            {categoryIds.map((catId) => (
               <button
-                key={cat}
-                onClick={() => setFilterCat(cat)}
+                key={catId}
+                onClick={() => setFilterCat(catId)}
                 className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer
-                  ${filterCat === cat
+                  ${filterCat === catId
                     ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
                     : 'bg-white border border-slate-200 text-slate-600 hover:border-orange-300'
                   }`}
               >
-                {cat === 'all' ? 'All Items' : cat}
+                {catId === 'all' ? 'All Items' : getCategoryName(categories, catId)}
               </button>
             ))}
           </div>
@@ -254,7 +262,7 @@ export default function RestaurantDetail() {
         ) : (
           <>
             <h2 className="font-black text-slate-900 text-lg mb-4">
-              product — {filtered.length} item{filtered.length !== 1 ? 's' : ''}
+              Menu — {filtered.length} item{filtered.length !== 1 ? 's' : ''}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {filtered.map((p) => (

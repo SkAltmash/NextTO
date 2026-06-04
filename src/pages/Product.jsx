@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, startAfter, orderBy, or } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   UtensilsCrossed, Clock, MapPin, ChevronDown,
@@ -12,6 +12,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import toast from 'react-hot-toast';
 import { PauseCircle } from 'lucide-react';
+import { useCategories } from '../hooks/useCategories';
 
 /* ─── service tabs ─── */
 const SERVICE_TABS = [
@@ -439,43 +440,107 @@ export default function Product() {
   const tabParam = searchParams.get('tab') || 'food';
   const activeTab = SERVICE_TABS.some((t) => t.id === tabParam) ? tabParam : 'food';
   const { isOnline, storeLoading } = useCart();
+  const { categories } = useCategories();
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   const setActiveTab = (tabId) => {
     setSearchParams({ tab: tabId }, { replace: true });
+    setSelectedCategory('all'); // reset category when switching tabs
   };
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [lastDoc, setLastDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    const fetchAll = async () => {
+  const fetchProducts = async (isLoadMore = false) => {
+    if (activeTab === 'pickup') {
+      setLoading(false);
+      setLoadingMore(false);
+      return;
+    }
+
+    if (isLoadMore) {
+      setLoadingMore(true);
+    } else {
       setLoading(true);
       setError('');
-      try {
-        const snap = await getDocs(collection(db, 'products'));
-        setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      } catch (e) {
-        console.error(e);
-        setError('Failed to load. Check your connection.');
-      } finally {
-        setLoading(false);
+    }
+
+    try {
+      const constraints = [];
+
+      if (activeTab === 'special') {
+        constraints.push(
+          or(
+            where('isSpecial', '==', true),
+            where('isSpecial', '==', 'true'),
+            where('categoryId', '==', 'curd01')
+          )
+        );
+      } else if (activeTab === 'food') {
+        constraints.push(
+          or(
+            where('serviceType', '==', 'food'),
+            where('serviceType', '==', ''),
+            where('serviceType', '==', null)
+          )
+        );
+      } else {
+        constraints.push(where('serviceType', '==', activeTab));
       }
-    };
-    fetchAll();
-  }, []);
+
+      constraints.push(orderBy('__name__'));
+
+      if (isLoadMore && lastDoc) {
+        constraints.push(startAfter(lastDoc));
+      }
+
+      constraints.push(limit(15));
+
+      const q = query(collection(db, 'products'), ...constraints);
+      const snap = await getDocs(q);
+
+      const fetched = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      if (isLoadMore) {
+        setProducts((prev) => [...prev, ...fetched]);
+      } else {
+        setProducts(fetched);
+      }
+
+      setLastDoc(snap.docs[snap.docs.length - 1] || null);
+      setHasMore(snap.docs.length === 15);
+    } catch (e) {
+      console.error(e);
+      setError('Failed to load. Check your connection.');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    setProducts([]);
+    setLastDoc(null);
+    setHasMore(true);
+    fetchProducts(false);
+  }, [activeTab]);
 
   const currentTab = SERVICE_TABS.find((t) => t.id === activeTab);
 
-  /* filter by serviceType for the 3 product tabs */
-  const filteredProducts = activeTab === 'pickup'
-    ? []
-    : activeTab === 'special'
-    ? products.filter((p) => p.isSpecial === true || String(p.isSpecial) === 'true' || p.categoryId === 'curd01')
-    : products.filter((p) => {
-      const st = (p.serviceType ?? '').toLowerCase();
-      return st === activeTab || (activeTab === 'food' && !st); // fallback: untagged → food
-    });
+  /* Map service tab → category serviceType */
+  const TAB_TO_SERVICE_TYPE = { food: 'food', grocery: 'grocery', medicine: 'medicine' };
+  const tabServiceType = TAB_TO_SERVICE_TYPE[activeTab];
+  const tabCategories = tabServiceType
+    ? categories.filter((c) => c.serviceType === tabServiceType)
+    : [];
+
+  const filteredProducts = selectedCategory === 'all'
+    ? products
+    : products.filter((p) => p.categoryId === selectedCategory);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 pb-28 md:pb-16">
@@ -567,6 +632,42 @@ export default function Product() {
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ duration: 0.22 }}
               >
+                {/* ── Category filter chips ── */}
+                {tabCategories.length > 0 && (
+                  <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-3 mb-5 -mx-4 px-4 sm:mx-0 sm:px-0">
+                    {/* All chip */}
+                    <button
+                      onClick={() => setSelectedCategory('all')}
+                      className={`shrink-0 px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer border ${
+                        selectedCategory === 'all'
+                          ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {tabCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setSelectedCategory(cat.id)}
+                        className={`shrink-0 flex items-center gap-2 pl-1.5 pr-4 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer border ${
+                          selectedCategory === cat.id
+                            ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'
+                        }`}
+                      >
+                        {cat.image && (
+                          <img
+                            src={cat.image}
+                            alt={cat.name}
+                            className="w-6 h-6 rounded-full object-cover"
+                          />
+                        )}
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {filteredProducts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
                     <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center">
@@ -586,6 +687,25 @@ export default function Product() {
                         <ProductCard key={p.id} product={p} />
                       ))}
                     </div>
+
+                    {hasMore && (
+                      <div className="flex justify-center mt-10">
+                        <button
+                          onClick={() => fetchProducts(true)}
+                          disabled={loadingMore}
+                          className="bg-white border border-slate-200 hover:border-orange-300 text-slate-700 hover:text-orange-500 font-bold px-6 py-2.5 rounded-full shadow-sm hover:shadow transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {loadingMore ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin text-orange-500" />
+                              Loading...
+                            </>
+                          ) : (
+                            'Load More Items'
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </motion.div>

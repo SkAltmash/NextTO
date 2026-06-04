@@ -19,6 +19,7 @@ import {
   MessageSquare,
   Store,
   Heart,
+  LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -45,7 +46,7 @@ export default function Navbar() {
   const [cartOpen, setCartOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [allData, setAllData] = useState({ products: [], restaurants: [] });
+  const [allData, setAllData] = useState({ products: [], restaurants: [], categories: [] });
   const [dataLoaded, setDataLoaded] = useState(false);
   const searchRef = useRef(null);
 
@@ -77,10 +78,12 @@ export default function Navbar() {
       Promise.all([
         getDocs(collection(db, 'products')),
         getDocs(collection(db, 'restaurants')),
-      ]).then(([pSnap, rSnap]) => {
+        getDocs(collection(db, 'categories')),
+      ]).then(([pSnap, rSnap, cSnap]) => {
         setAllData({
-          products: pSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+          products:    pSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
           restaurants: rSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+          categories:  cSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
         });
         setDataLoaded(true);
       }).catch(console.error);
@@ -90,6 +93,12 @@ export default function Navbar() {
 
   /* filtered results */
   const q = searchQuery.trim().toLowerCase();
+  const resultCategories = q
+    ? allData.categories.filter((c) =>
+        c.name?.toLowerCase().includes(q) ||
+        c.serviceType?.toLowerCase().includes(q)
+      ).slice(0, 4)
+    : [];
   const resultProducts = q
     ? allData.products.filter((p) =>
       p.name?.toLowerCase().includes(q) ||
@@ -102,7 +111,7 @@ export default function Navbar() {
       r.address?.toLowerCase().includes(q)
     ).slice(0, 3)
     : [];
-  const hasResults = resultProducts.length > 0 || resultRestaurants.length > 0;
+  const hasResults = resultCategories.length > 0 || resultProducts.length > 0 || resultRestaurants.length > 0;
 
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
@@ -345,7 +354,7 @@ export default function Navbar() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search food, restaurants…"
+                  placeholder="Search food, categories, restaurants…"
                   className="flex-1 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none bg-transparent"
                 />
                 {searchQuery && (
@@ -388,9 +397,44 @@ export default function Navbar() {
                       </div>
                     )}
 
+                    {/* Category results */}
+                    {resultCategories.length > 0 && (
+                      <div>
+                        <p className="px-4 pt-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">Categories</p>
+                        {resultCategories.map((cat) => {
+                          const CAT_GRADIENT = {
+                            food:     'from-orange-400 to-amber-500',
+                            medicine: 'from-blue-400 to-cyan-500',
+                            grocery:  'from-emerald-400 to-teal-500',
+                          };
+                          return (
+                            <button
+                              key={cat.id}
+                              onClick={() => goTo(`/categories/${cat.id}`)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 transition-colors cursor-pointer text-left"
+                            >
+                              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${CAT_GRADIENT[cat.serviceType] ?? 'from-slate-400 to-slate-500'} overflow-hidden shrink-0 flex items-center justify-center`}>
+                                {cat.image
+                                  ? <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
+                                  : <LayoutGrid size={16} className="text-white/80" />
+                                }
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-slate-800 text-sm truncate">{cat.name}</p>
+                                {cat.serviceType && (
+                                  <p className="text-slate-400 text-[10px] font-semibold capitalize">{cat.serviceType}</p>
+                                )}
+                              </div>
+                              <LayoutGrid size={12} className="text-slate-300 shrink-0" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     {/* Product results */}
                     {resultProducts.length > 0 && (
-                      <div>
+                      <div className={resultCategories.length > 0 ? 'border-t border-slate-50' : ''}>
                         <p className="px-4 pt-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">Items</p>
                         {resultProducts.map((p) => (
                           <button

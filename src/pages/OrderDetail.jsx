@@ -5,27 +5,27 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import {
-	  ArrowLeft, Clock, MapPin, Package, Loader2, AlertCircle,
-	  ClipboardList, CheckCircle2, ChefHat, Bike, XCircle,
-	  Phone, CreditCard, Banknote, Store, Copy, Check, FileImage, Navigation, Tag
-	} from 'lucide-react';
+  ArrowLeft, ArrowRight, Clock, MapPin, Package, Loader2, AlertCircle,
+  ClipboardList, CheckCircle2, ChefHat, Bike, XCircle,
+  Phone, CreditCard, Banknote, Store, Copy, Check, FileImage, Navigation, Tag
+} from 'lucide-react';
 
 // ─── Status Config ─────────────────────────────────────────────────────────────
 const STEPS = [
-  { key: 'pending',   label: 'Order Placed',    icon: ClipboardList, desc: 'We received your order'         },
-  { key: 'confirmed', label: 'Confirmed',        icon: CheckCircle2,  desc: 'Restaurant accepted your order' },
-  { key: 'preparing', label: 'Preparing',        icon: ChefHat,       desc: 'Your food is being prepared'   },
-  { key: 'out',       label: 'Out for Delivery', icon: Bike,          desc: 'On the way to you!'            },
-  { key: 'delivered', label: 'Delivered',        icon: CheckCircle2,  desc: 'Enjoy your meal!'              },
+  { key: 'pending', label: 'Order Placed', icon: ClipboardList, desc: 'We received your order' },
+  { key: 'confirmed', label: 'Confirmed', icon: CheckCircle2, desc: 'Restaurant accepted your order' },
+  { key: 'preparing', label: 'Preparing', icon: ChefHat, desc: 'Your food is being prepared' },
+  { key: 'out', label: 'Out for Delivery', icon: Bike, desc: 'On the way to you!' },
+  { key: 'delivered', label: 'Delivered', icon: CheckCircle2, desc: 'Enjoy your meal!' },
 ];
 
 const STATUS_COLOR = {
-  pending:   { badge: 'bg-blue-50 text-blue-600 border-blue-100',         bar: 'bg-blue-500',    glow: 'shadow-blue-200'    },
-  confirmed: { badge: 'bg-amber-50 text-amber-600 border-amber-100',       bar: 'bg-amber-500',   glow: 'shadow-amber-200'   },
-  preparing: { badge: 'bg-orange-50 text-orange-600 border-orange-100',    bar: 'bg-orange-500',  glow: 'shadow-orange-200'  },
-  out:       { badge: 'bg-purple-50 text-purple-600 border-purple-100',    bar: 'bg-purple-500',  glow: 'shadow-purple-200'  },
+  pending: { badge: 'bg-blue-50 text-blue-600 border-blue-100', bar: 'bg-blue-500', glow: 'shadow-blue-200' },
+  confirmed: { badge: 'bg-amber-50 text-amber-600 border-amber-100', bar: 'bg-amber-500', glow: 'shadow-amber-200' },
+  preparing: { badge: 'bg-orange-50 text-orange-600 border-orange-100', bar: 'bg-orange-500', glow: 'shadow-orange-200' },
+  out: { badge: 'bg-purple-50 text-purple-600 border-purple-100', bar: 'bg-purple-500', glow: 'shadow-purple-200' },
   delivered: { badge: 'bg-emerald-50 text-emerald-600 border-emerald-100', bar: 'bg-emerald-500', glow: 'shadow-emerald-200' },
-  cancelled: { badge: 'bg-red-50 text-red-500 border-red-100',             bar: 'bg-red-400',     glow: 'shadow-red-200'     },
+  cancelled: { badge: 'bg-red-50 text-red-500 border-red-100', bar: 'bg-red-400', glow: 'shadow-red-200' },
 };
 
 // ─── Step Tracker ──────────────────────────────────────────────────────────────
@@ -49,11 +49,11 @@ function StepTracker({ status }) {
   return (
     <div className="space-y-0">
       {STEPS.map((step, i) => {
-        const done    = i < currentIdx;
-        const active  = i === currentIdx;
+        const done = i < currentIdx;
+        const active = i === currentIdx;
         const pending = i > currentIdx;
-        const Icon    = step.icon;
-        const isLast  = i === STEPS.length - 1;
+        const Icon = step.icon;
+        const isLast = i === STEPS.length - 1;
 
         return (
           <div key={step.key} className="flex gap-4">
@@ -64,9 +64,9 @@ function StepTracker({ status }) {
                 animate={active ? { scale: [1, 1.1, 1] } : {}}
                 transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
                 className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 transition-all
-                  ${done    ? 'bg-emerald-500 shadow-lg shadow-emerald-200'  : ''}
-                  ${active  ? 'bg-orange-500 shadow-lg shadow-orange-200'    : ''}
-                  ${pending ? 'bg-slate-100'                                  : ''}`}
+                  ${done ? 'bg-emerald-500 shadow-lg shadow-emerald-200' : ''}
+                  ${active ? 'bg-orange-500 shadow-lg shadow-orange-200' : ''}
+                  ${pending ? 'bg-slate-100' : ''}`}
               >
                 <Icon size={16}
                   className={done || active ? 'text-white' : 'text-slate-400'}
@@ -90,14 +90,14 @@ function StepTracker({ status }) {
             {/* Text */}
             <div className={`pb-5 flex-1 ${isLast ? 'pb-0' : ''}`}>
               <p className={`font-black text-sm leading-tight
-                ${done    ? 'text-emerald-600' : ''}
-                ${active  ? 'text-orange-600'  : ''}
-                ${pending ? 'text-slate-300'    : ''}`}>
+                ${done ? 'text-emerald-600' : ''}
+                ${active ? 'text-orange-600' : ''}
+                ${pending ? 'text-slate-300' : ''}`}>
                 {step.label}
               </p>
               {(done || active) && (
                 <p className={`text-xs font-semibold mt-0.5
-                  ${done   ? 'text-slate-400' : ''}
+                  ${done ? 'text-slate-400' : ''}
                   ${active ? 'text-orange-400' : ''}`}>
                   {step.desc}
                 </p>
@@ -127,14 +127,14 @@ function InfoRow({ icon: Icon, label, value, mono }) {
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function OrderDetail() {
-  const { id }    = useParams();
-  const { user }  = useAuth();
-  const navigate  = useNavigate();
+  const { id } = useParams();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const [order,   setOrder]   = useState(null);
+  const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
-  const [copied,  setCopied]  = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -160,13 +160,27 @@ export default function OrderDetail() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const cfg    = STATUS_COLOR[order?.status] ?? STATUS_COLOR.pending;
-  const date   = order?.createdAt?.toDate
+  const cfg = STATUS_COLOR[order?.status] ?? STATUS_COLOR.pending;
+  const date = order?.createdAt?.toDate
     ? order.createdAt.toDate().toLocaleDateString('en-IN', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit',
-      })
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })
     : 'Just now';
+
+  const uniqueRestaurants = [];
+  const seenRestIds = new Set();
+  order?.items?.forEach((item) => {
+    if (item.restaurantId && !seenRestIds.has(item.restaurantId)) {
+      seenRestIds.add(item.restaurantId);
+      uniqueRestaurants.push({
+        id: item.restaurantId,
+        name: item.restaurantName || 'Restaurant',
+        logo: item.restaurantLogo,
+        phone: item.restaurantPhone,
+      });
+    }
+  });
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -260,7 +274,17 @@ export default function OrderDetail() {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-slate-800 text-sm truncate">{item.productName}</p>
-                  <p className="text-slate-400 text-xs font-semibold mt-0.5">×{item.quantity}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <p className="text-slate-400 text-xs font-semibold">×{item.quantity}</p>
+                    {uniqueRestaurants.length > 1 && item.restaurantName && (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-slate-300 shrink-0" />
+                        <span className="text-[10px] bg-orange-50 text-orange-600 font-bold px-1.5 py-0.5 rounded-md truncate max-w-[120px]" title={item.restaurantName}>
+                          {item.restaurantName}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <p className="font-black text-slate-900 text-sm shrink-0">
                   ₹{item.price * item.quantity}
@@ -308,35 +332,35 @@ export default function OrderDetail() {
               <span>₹{order?.totalAmount}</span>
             </div>
           </div>
-	        </motion.div>
-	
-	        {/* ── Pickup & Drop Route ── */}
-	        {order?.pickupDrop && (
-	          <motion.div
-	            initial={{ opacity: 0, y: 16 }}
-	            animate={{ opacity: 1, y: 0 }}
-	            transition={{ delay: 0.08 }}
-	            className="bg-white rounded-3xl border border-slate-100 shadow-sm px-5 py-4"
-	          >
-	            <h2 className="font-black text-slate-900 text-sm mb-1">Pickup &amp; Drop Route</h2>
-	            <InfoRow
-	              icon={Navigation}
-	              label="Pickup Area"
-	              value={`${order.pickupDrop.pickupLocationName ?? ''} · ₹${order.pickupDrop.pickupCharge ?? 0}`}
-	            />
-	            <InfoRow
-	              icon={MapPin}
-	              label="Drop Area"
-	              value={`${order.pickupDrop.dropLocationName ?? ''} · ₹${order.pickupDrop.dropCharge ?? 0}`}
-	            />
-	            {order.pickupDrop.note && (
-	              <InfoRow icon={Package} label="Note" value={order.pickupDrop.note} />
-	            )}
-	          </motion.div>
-	        )}
+        </motion.div>
 
-	        {/* ── Delivery Info ── */}
-	        <motion.div
+        {/* ── Pickup & Drop Route ── */}
+        {order?.pickupDrop && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            className="bg-white rounded-3xl border border-slate-100 shadow-sm px-5 py-4"
+          >
+            <h2 className="font-black text-slate-900 text-sm mb-1">Pickup &amp; Drop Route</h2>
+            <InfoRow
+              icon={Navigation}
+              label="Pickup Area"
+              value={`${order.pickupDrop.pickupLocationName ?? ''} · ₹${order.pickupDrop.pickupCharge ?? 0}`}
+            />
+            <InfoRow
+              icon={MapPin}
+              label="Drop Area"
+              value={`${order.pickupDrop.dropLocationName ?? ''} · ₹${order.pickupDrop.dropCharge ?? 0}`}
+            />
+            {order.pickupDrop.note && (
+              <InfoRow icon={Package} label="Note" value={order.pickupDrop.note} />
+            )}
+          </motion.div>
+        )}
+
+        {/* ── Delivery Info ── */}
+        <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -356,12 +380,26 @@ export default function OrderDetail() {
               value={order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod.toUpperCase()}
             />
           )}
-          {order?.restaurantName && (
-            <InfoRow icon={Store} label="Restaurant" value={order.restaurantName} />
-          )}
-          {order?.restaurantPhone && (
-            <InfoRow icon={Phone} label="Restaurant Phone" value={order.restaurantPhone} />
-          )}
+
+          {uniqueRestaurants.map((rest) => (
+            <div key={rest.id} className="flex items-center justify-between border-b border-slate-50 last:border-0 pr-1">
+              <div className="flex-1">
+                <InfoRow
+                  icon={Store}
+                  label="Restaurant"
+                  value={rest.name}
+                />
+              </div>
+              <button
+                onClick={() => navigate(`/restaurant/${rest.id}`)}
+                className="w-8 h-8 rounded-xl bg-orange-50 hover:bg-orange-100 flex items-center justify-center text-orange-500 transition-colors cursor-pointer shrink-0"
+                title={`Go to ${rest.name}`}
+              >
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          ))}
+
           {order?.appliedCouponCode && (
             <InfoRow
               icon={Tag}
