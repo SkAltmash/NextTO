@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
+import { useStoreStatus } from '../hooks/useStoreStatus';
 
 const CartContext = createContext(null);
 
@@ -34,6 +35,7 @@ function cartReducer(state, action) {
 }
 
 export function CartProvider({ children }) {
+  const { isOnline, loading: storeLoading } = useStoreStatus();
   const [cart, dispatch] = useReducer(cartReducer, [], () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -70,12 +72,16 @@ export function CartProvider({ children }) {
 
   // ── Guarded addToCart: block if Pickup & Drop is in cart ──
   const addToCart = useCallback((item) => {
+    if (!isOnline) {
+      toast.error('Store is currently paused. Please try again later.', { id: 'store-offline' });
+      return;
+    }
     if (pickupOrderData) {
       toast.error('Remove Pickup & Drop from cart first to add items', { id: 'cart-conflict' });
       return;
     }
     dispatch({ type: 'ADD', item });
-  }, [pickupOrderData]);
+  }, [isOnline, pickupOrderData]);
 
   const removeFromCart = (id) => dispatch({ type: 'REMOVE', id });
   const updateQty    = (id, qty) => dispatch({ type: 'UPDATE_QTY', id, qty });
@@ -86,12 +92,16 @@ export function CartProvider({ children }) {
 
   // ── Guarded setPickupOrderData: block if delivery items exist ──
   const setPickupOrderData = useCallback((data) => {
+    if (data && !isOnline) {
+      toast.error('Store is currently paused. Please try again later.', { id: 'store-offline' });
+      return;
+    }
     if (data && hasDeliveryItems) {
       toast.error('Remove Food/Grocery/Medicine items from cart first to add Pickup & Drop', { id: 'cart-conflict' });
       return;
     }
     setPickupOrderDataRaw(data);
-  }, [hasDeliveryItems]);
+  }, [isOnline, hasDeliveryItems]);
 
   const FAV_STORAGE_KEY = 'fe_favorites';
   const [favorites, setFavorites] = useState(() => {
@@ -135,7 +145,8 @@ export function CartProvider({ children }) {
       value={{ cart, addToCart, removeFromCart, updateQty, clearCart, totalItems, totalPrice,
                pickupOrderData, setPickupOrderData,
                hasDeliveryItems,
-               favorites, toggleFavorite, isFavorite }}
+               favorites, toggleFavorite, isFavorite,
+               isOnline, storeLoading }}
     >
       {children}
     </CartContext.Provider>

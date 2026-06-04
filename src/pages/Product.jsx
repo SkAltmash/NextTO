@@ -6,11 +6,12 @@ import {
   UtensilsCrossed, Clock, MapPin, ChevronDown,
   Loader2, AlertCircle, Plus, Minus, CheckCircle2,
   ShoppingBasket, Pill, Bike, Navigation, Package,
-  ImagePlus, X as XIcon, FileImage, Heart
+  ImagePlus, X as XIcon, FileImage, Heart, Sparkles
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import toast from 'react-hot-toast';
+import { PauseCircle } from 'lucide-react';
 
 /* ─── service tabs ─── */
 const SERVICE_TABS = [
@@ -18,6 +19,7 @@ const SERVICE_TABS = [
   { id: 'grocery', label: 'Grocery', icon: ShoppingBasket, color: 'emerald' },
   { id: 'medicine', label: 'Medicine', icon: Pill, color: 'blue' },
   { id: 'pickup', label: 'Pickup & Drop', icon: Bike, color: 'purple' },
+  { id: 'special', label: 'Specials', icon: Sparkles, color: 'amber' },
 ];
 
 const TAB_COLORS = {
@@ -25,15 +27,18 @@ const TAB_COLORS = {
   emerald: { active: 'bg-emerald-500 text-white shadow-emerald-500/25', inactive: 'bg-white border border-slate-200 text-slate-600 hover:border-emerald-300' },
   blue: { active: 'bg-blue-500 text-white shadow-blue-500/25', inactive: 'bg-white border border-slate-200 text-slate-600 hover:border-blue-300' },
   purple: { active: 'bg-purple-500 text-white shadow-purple-500/25', inactive: 'bg-white border border-slate-200 text-slate-600 hover:border-purple-300' },
+  amber: { active: 'bg-amber-500 text-white shadow-amber-500/25', inactive: 'bg-white border border-slate-200 text-slate-600 hover:border-amber-300' },
 };
 
 /* ═══════════════════════════════════════════
    PRODUCT CARD (no star)
 ═══════════════════════════════════════════ */
-function ProductCard({ product }) {
-  const { addToCart, cart, updateQty, pickupOrderData, toggleFavorite, isFavorite } = useCart();
+export function ProductCard({ product }) {
+  const { addToCart, cart, updateQty, pickupOrderData, toggleFavorite, isFavorite, isOnline } = useCart();
   const navigate = useNavigate();
   const [added, setAdded] = useState(false);
+
+  const isSpecial = product.isSpecial === true || String(product.isSpecial) === 'true' || product.categoryId === 'curd01';
 
   const cartItem = cart.find((i) => i.id === product.id);
   const discount = product.price && product.discountPrice
@@ -53,7 +58,11 @@ function ProductCard({ product }) {
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.28 }}
-      className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-100/40 overflow-hidden cursor-pointer group transition-shadow relative"
+      className={`bg-white rounded-3xl border overflow-hidden cursor-pointer group transition-shadow relative
+        ${isSpecial
+          ? 'border-amber-300 shadow-sm hover:shadow-xl hover:shadow-amber-100/50'
+          : 'border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-100/40'
+        }`}
       onClick={() => navigate(`/product/${product.id}`)}
     >
       {/* Image */}
@@ -72,6 +81,13 @@ function ProductCard({ product }) {
         {discount && (
           <div className="absolute top-2 left-2 bg-orange-500 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full shadow">
             {discount}% OFF
+          </div>
+        )}
+        
+        {isSpecial && (
+          <div className="absolute bottom-2 left-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 border border-yellow-300/40">
+            <Sparkles size={8} className="animate-pulse" />
+            SPECIAL
           </div>
         )}
         
@@ -119,7 +135,16 @@ function ProductCard({ product }) {
           </div>
 
           {product.isAvailable !== false && (
-            pickupOrderData ? (
+            !isOnline ? (
+              // Store is paused — no add button
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="p-2 rounded-xl bg-slate-100 text-slate-300 cursor-not-allowed"
+                title="Store is currently paused"
+              >
+                <PauseCircle size={14} />
+              </div>
+            ) : pickupOrderData ? (
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="p-2 rounded-xl bg-slate-100 text-slate-400 cursor-not-allowed"
@@ -413,6 +438,7 @@ export default function Product() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') || 'food';
   const activeTab = SERVICE_TABS.some((t) => t.id === tabParam) ? tabParam : 'food';
+  const { isOnline, storeLoading } = useCart();
 
   const setActiveTab = (tabId) => {
     setSearchParams({ tab: tabId }, { replace: true });
@@ -444,6 +470,8 @@ export default function Product() {
   /* filter by serviceType for the 3 product tabs */
   const filteredProducts = activeTab === 'pickup'
     ? []
+    : activeTab === 'special'
+    ? products.filter((p) => p.isSpecial === true || String(p.isSpecial) === 'true' || p.categoryId === 'curd01')
     : products.filter((p) => {
       const st = (p.serviceType ?? '').toLowerCase();
       return st === activeTab || (activeTab === 'food' && !st); // fallback: untagged → food
@@ -451,6 +479,23 @@ export default function Product() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 pb-28 md:pb-16">
+
+      {/* ── Store Paused Banner ── */}
+      <AnimatePresence>
+        {!storeLoading && !isOnline && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="bg-amber-500 text-white px-4 py-3 flex items-center justify-center gap-2.5 shadow-lg"
+          >
+            <PauseCircle size={18} className="shrink-0" />
+            <p className="text-sm font-black">
+              Store is temporarily paused — ordering is disabled. We'll be back soon!
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Sticky service tab bar ── */}
       <div className="bg-white/90 backdrop-blur-xl border-b border-slate-100 sticky top-14 md:top-16 z-40">

@@ -3,14 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin, ChevronDown, Loader2, CheckCircle2, AlertCircle,
   ShoppingBag, ArrowLeft, Package, Truck, Tag, Wallet, Banknote, Phone,
-  Bike, Navigation
+  Bike, Navigation, PauseCircle
 } from 'lucide-react';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { validateCoupon, incrementCouponUsage } from '../utils/couponUtils';
 
 // ─── Delivery Location Dropdown ──────────────────────────────────────────────
 function LocationDropdown({ locations, selected, onSelect, disabled }) {
@@ -103,7 +104,7 @@ function SummaryItem({ item }) {
 
 // ─── Main Checkout Page ───────────────────────────────────────────────────────
 export default function Checkout() {
-  const { cart, totalPrice, clearCart, pickupOrderData } = useCart();
+  const { cart, totalPrice, clearCart, pickupOrderData, isOnline } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -114,6 +115,12 @@ export default function Checkout() {
   const [locLoading, setLocLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cod');
+
+  // ── Coupon state ──────────────────────────────────────────────────────────
+  const [couponCode, setCouponCode] = useState('');
+  const [couponResult, setCouponResult] = useState(null);   // { valid, coupon, cartDiscount, deliveryDiscount }
+  const [couponError, setCouponError] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
 
   // Redirect if cart is empty AND no pickup-drop request
   useEffect(() => {
@@ -154,13 +161,24 @@ export default function Checkout() {
 
   const pickupDropCharge = Number(pickupOrderData?.totalCharge ?? 0);
   const deliveryCharge = Number(selectedLoc?.deliveryCharge ?? 0);
-  const totalAmount = totalPrice + (needsDeliveryArea ? deliveryCharge : 0) + pickupDropCharge;
+
+  // Coupon discounts (default 0 when none applied)
+  const couponCartDiscount     = couponResult?.cartDiscount     ?? 0;
+  const couponDeliveryDiscount = couponResult?.deliveryDiscount ?? 0;
+
+  const totalAmount =
+    totalPrice +
+    (needsDeliveryArea ? deliveryCharge : 0) +
+    pickupDropCharge -
+    couponCartDiscount -
+    couponDeliveryDiscount;
 
   const belowMin =
     cart.length > 0 &&
     selectedLoc && totalPrice < (selectedLoc.minOrder ?? 0);
 
   const canOrder =
+    isOnline &&
     (!needsDeliveryArea || selectedLoc) &&
     address.trim().length > 0 &&
     mobile.trim().length >= 10 &&
@@ -182,6 +200,43 @@ export default function Checkout() {
 
   const numberValue = (value) => Number(value ?? 0) || 0;
 
+  // ── Coupon handlers ───────────────────────────────────────────────────────
+  const handleApplyCoupon = async () => {
+    setCouponError('');
+    setCouponResult(null);
+    setCouponLoading(true);
+    try {
+      // For multi-restaurant carts pass '' so scope:all coupons still work
+      const primaryRestaurantId = restaurantIds?.[0] ?? '';
+      const result = await validateCoupon(
+        couponCode,
+        totalPrice,           // cart subtotal before delivery
+        primaryRestaurantId,
+        deliveryCharge
+      );
+      if (!result.valid) {
+        setCouponError(result.error);
+      } else {
+        setCouponResult(result);
+        toast.success(`Coupon "${result.coupon.code}" applied! 🎉`);
+      }
+    } catch (err) {
+      console.error('Coupon validation error:', err);
+      setCouponError('Could not validate coupon. Please try again.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponResult(null);
+    setCouponCode('');
+    setCouponError('');
+  };
+
+  // Unique restaurant IDs used both for restaurant fetching AND coupon scope checks
+  const restaurantIds = [...new Set(cart.map((i) => i.restaurantId).filter(Boolean))];
+
   const handlePlaceOrder = async () => {
     if (!canOrder) return;
     setPlacing(true);
@@ -190,9 +245,11 @@ export default function Checkout() {
       const selectedDeliveryPartnerId = selectedLoc?.assignedPartnerId ?? '';
       const selectedDeliveryPartnerName = selectedLoc?.assignedPartnerName ?? '';
       let selectedDeliveryPartnerEarning = 0;
+      let isPartnerOnline = true;
       if (selectedDeliveryPartnerId) {
         const partner = await getPartner(selectedDeliveryPartnerId);
         selectedDeliveryPartnerEarning = numberValue(partner?.commissionFlat);
+        isPartnerOnline = partner ? (partner.isOnline !== false) : true;
       }
 
       // ── Pickup & Drop partner commission from deliveryPartners ─────────────
@@ -245,16 +302,15 @@ export default function Checkout() {
       const pickupDropOnly = pickupDropDetails && !needsDeliveryArea;
       const deliveryPartnerId = pickupDropOnly
         ? pickupDropDetails.assignedPartnerId
-        : selectedDeliveryPartnerId;
+        : (isPartnerOnline ? selectedDeliveryPartnerId : '');
       const deliveryPartnerName = pickupDropOnly
         ? pickupDropDetails.assignedPartnerName
-        : selectedDeliveryPartnerName;
+        : (isPartnerOnline ? selectedDeliveryPartnerName : '');
       const deliveryPartnerEarning = pickupDropOnly
         ? pickupDropDetails.partnerEarning
-        : selectedDeliveryPartnerEarning;
+        : (isPartnerOnline ? selectedDeliveryPartnerEarning : 0);
 
-      // Unique restaurant IDs across all cart items (for admin reference)
-      const restaurantIds = [...new Set(cart.map((i) => i.restaurantId).filter(Boolean))];
+      // Unique restaurant IDs across all cart items (for admin reference) — already computed above
 
       // Fetch ALL unique restaurants in parallel so each item gets its own commission rate & phone
       const restaurantDataMap = {}; // { [restaurantId]: { phone, commissionRate } }
@@ -320,7 +376,8 @@ export default function Checkout() {
 
       const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
       const orderDeliveryCharge = needsDeliveryArea ? deliveryCharge : 0;
-      const finalTotalAmount = subtotal + orderDeliveryCharge;
+      const finalTotalAmount =
+        subtotal + orderDeliveryCharge - couponCartDiscount - couponDeliveryDiscount;
 
       const orderRef = await addDoc(collection(db, 'orders'), {
         // Order type
@@ -360,6 +417,12 @@ export default function Checkout() {
         deliveryPartnerId,
         deliveryPartnerName,
         deliveryPartnerEarning,
+
+        // Coupon
+        appliedCouponId:   couponResult?.coupon?.id   ?? null,
+        appliedCouponCode: couponResult?.coupon?.code ?? null,
+        couponCartDiscount,
+        couponDeliveryDiscount,
 
         // Totals
         subtotal,
@@ -479,27 +542,84 @@ export default function Checkout() {
       }
 
       // 3️⃣  Delivery partner
-      if (cart.length > 0 && deliveryPartnerId && botToken) {
-        try {
-          const partnerSnap = await getDoc(doc(db, 'deliveryPartners', deliveryPartnerId));
-          const partnerChatId = partnerSnap.exists() ? partnerSnap.data().telegramChatId : null;
-          if (partnerChatId) {
-            const partnerMsg =
-              `🛵 <b>New Delivery Assignment!</b>\n` +
-              `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
-              `<b>Items:</b>\n${itemLines}\n\n` +
-              `Subtotal: ₹${totalPrice}\n` +
-              `Delivery: ₹${deliveryCharge}\n` +
-              `<b>Total: ₹${totalPrice + deliveryCharge}</b>\n\n` +
-              `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
-              `Address: ${escapeHtml(address.trim())}\n` +
-              `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
-              `Mobile: ${escapeHtml(mobile.trim())}`;
+      const checkPartnerId = pickupDropOnly
+        ? pickupDropDetails?.assignedPartnerId
+        : selectedDeliveryPartnerId;
 
-            await sendTelegram(partnerChatId, partnerMsg);
+      if (cart.length > 0 && checkPartnerId && botToken) {
+        try {
+          const partnerSnap = await getDoc(doc(db, 'deliveryPartners', checkPartnerId));
+          if (partnerSnap.exists()) {
+            const partnerData = partnerSnap.data();
+            const isPartnerOnline = partnerData.isOnline !== false;
+
+            if (isPartnerOnline) {
+              const partnerChatId = partnerData.telegramChatId;
+              if (partnerChatId) {
+                const partnerMsg =
+                  `🛵 <b>New Delivery Assignment!</b>\n` +
+                  `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
+                  `<b>Items:</b>\n${itemLines}\n\n` +
+                  `Subtotal: ₹${totalPrice}\n` +
+                  `Delivery: ₹${deliveryCharge}\n` +
+                  `<b>Total: ₹${totalPrice + deliveryCharge}</b>\n\n` +
+                  `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
+                  `Address: ${escapeHtml(address.trim())}\n` +
+                  `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
+                  `Mobile: ${escapeHtml(mobile.trim())}`;
+
+                await sendTelegram(partnerChatId, partnerMsg);
+              }
+            } else {
+              // Partner is offline! Send msg to Admin
+              const configSnap = await getDoc(doc(db, 'config', 'telegram'));
+              const adminChatId = configSnap.exists() ? configSnap.data().adminChatId : null;
+
+              if (adminChatId) {
+                // Fetch all online partners
+                let onlinePartnersList = 'None';
+                try {
+                  const partnersSnap = await getDocs(
+                    query(collection(db, 'deliveryPartners'), where('isOnline', '==', true))
+                  );
+                  const onlinePartners = partnersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                  if (onlinePartners.length > 0) {
+                    onlinePartnersList = onlinePartners
+                      .map(p => `  • ${escapeHtml(p.name)} (${escapeHtml(p.mobile || p.phone || 'No Mobile')})`)
+                      .join('\n');
+                  }
+                } catch (err) {
+                  console.warn('Failed to fetch online partners:', err);
+                }
+
+                const adminMsg =
+                  `⚠️ <b>Delivery Partner Offline Alert!</b>\n\n` +
+                  `The assigned partner for this order's location is currently <b>offline</b>.\n\n` +
+                  `<b>Order Details:</b>\n` +
+                  `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n` +
+                  `Location: <b>${escapeHtml(selectedLoc?.name || '')}</b>\n` +
+                  `Total: ₹${totalPrice + deliveryCharge}\n` +
+                  `<b>Items:</b>\n${itemLines}\n\n` +
+                  `<b>Assigned Partner Details (Offline):</b>\n` +
+                  `Name: ${escapeHtml(partnerData.name || 'Unknown')}\n` +
+                  `Mobile: ${escapeHtml(partnerData.mobile || partnerData.phone || 'N/A')}\n\n` +
+                  `<b>Online Delivery Partners:</b>\n${onlinePartnersList}`;
+
+                await sendTelegram(adminChatId, adminMsg);
+              }
+            }
           }
         } catch (tgErr) {
-          console.warn('Partner Telegram notification skipped:', tgErr);
+          console.warn('Partner/Admin Telegram notification skipped:', tgErr);
+        }
+      }
+
+      // ── Increment coupon usage AFTER order is saved ──────────────────────
+      if (couponResult?.coupon?.id) {
+        try {
+          await incrementCouponUsage(couponResult.coupon.id);
+        } catch (couponErr) {
+          console.warn('Coupon usage increment failed (non-critical):', couponErr);
         }
       }
 
@@ -532,6 +652,28 @@ export default function Checkout() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+        {/* ── Store Paused Banner ── */}
+        <AnimatePresence>
+          {!isOnline && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="flex items-start gap-3 bg-amber-50 border-2 border-amber-300 rounded-2xl px-4 py-4"
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                <PauseCircle size={20} className="text-amber-500" />
+              </div>
+              <div>
+                <p className="font-black text-amber-800 text-sm">Store is temporarily paused</p>
+                <p className="text-amber-600 text-xs font-semibold mt-0.5 leading-relaxed">
+                  We're not accepting new orders right now. Please check back soon!
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Order Summary ── */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -681,6 +823,76 @@ export default function Checkout() {
           />
         </div>
 
+        {/* ── Coupon Code ── */}
+        {cart.length > 0 && (
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-3">
+            <div className="flex items-center gap-2.5 mb-1">
+              <Tag size={17} className="text-orange-500" />
+              <h2 className="font-black text-slate-900 text-sm">Coupon Code</h2>
+            </div>
+
+            {!couponResult ? (
+              <>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(''); }}
+                    onKeyDown={(e) => e.key === 'Enter' && couponCode.trim() && handleApplyCoupon()}
+                    placeholder="Enter coupon code"
+                    maxLength={30}
+                    className="flex-1 px-4 py-3 rounded-2xl border-2 border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 uppercase placeholder-slate-400 placeholder:normal-case focus:outline-none focus:border-orange-400 focus:bg-white transition-all tracking-wider"
+                  />
+                  <button
+                    type="button"
+                    disabled={!couponCode.trim() || couponLoading}
+                    onClick={handleApplyCoupon}
+                    className="px-5 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm transition-all cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                  >
+                    {couponLoading
+                      ? <Loader2 size={15} className="animate-spin" />
+                      : 'Apply'}
+                  </button>
+                </div>
+                {couponError && (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 px-4 py-2.5 rounded-xl text-xs font-bold">
+                    <AlertCircle size={13} className="shrink-0" />
+                    {couponError}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-start justify-between gap-3 bg-green-50 border border-green-200 rounded-2xl px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-black text-green-700">
+                    <CheckCircle2 size={15} className="shrink-0 text-green-500" />
+                    <span className="tracking-wider">{couponResult.coupon.code}</span>
+                    <span className="font-semibold text-green-600">applied!</span>
+                  </p>
+                  {couponResult.coupon.description && (
+                    <p className="text-xs text-green-600 font-semibold mt-1 pl-5">{couponResult.coupon.description}</p>
+                  )}
+                  <div className="pl-5 mt-1 space-y-0.5">
+                    {couponResult.cartDiscount > 0 && (
+                      <p className="text-xs font-bold text-green-700">Cart discount: −₹{couponResult.cartDiscount}</p>
+                    )}
+                    {couponResult.deliveryDiscount > 0 && (
+                      <p className="text-xs font-bold text-green-700">Delivery discount: −₹{couponResult.deliveryDiscount}</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  className="text-xs font-black text-red-400 hover:text-red-600 transition-colors shrink-0 mt-0.5 cursor-pointer"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Price Breakdown ── */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
           <div className="flex items-center gap-2.5 mb-4">
@@ -704,15 +916,39 @@ export default function Checkout() {
               <div className="flex justify-between text-sm font-semibold text-slate-500">
                 <span>Delivery charge</span>
                 {selectedLoc ? (
-                  <span className="text-orange-500 font-bold">₹{deliveryCharge}</span>
+                  <span className={couponDeliveryDiscount > 0 ? 'line-through text-slate-400' : 'text-orange-500 font-bold'}>
+                    ₹{deliveryCharge}
+                  </span>
                 ) : (
                   <span className="text-slate-300">— select area</span>
                 )}
               </div>
             )}
+            {couponCartDiscount > 0 && (
+              <div className="flex justify-between text-sm font-semibold text-green-600">
+                <span className="flex items-center gap-1">
+                  <Tag size={12} className="shrink-0" /> Coupon discount
+                </span>
+                <span>−₹{couponCartDiscount}</span>
+              </div>
+            )}
+            {couponDeliveryDiscount > 0 && (
+              <div className="flex justify-between text-sm font-semibold text-green-600">
+                <span className="flex items-center gap-1">
+                  <Truck size={12} className="shrink-0" /> Delivery discount
+                </span>
+                <span>−₹{couponDeliveryDiscount}</span>
+              </div>
+            )}
+            {(couponCartDiscount > 0 || couponDeliveryDiscount > 0) && (
+              <div className="flex justify-between text-xs font-bold text-green-500 bg-green-50 px-3 py-1.5 rounded-xl">
+                <span>You save</span>
+                <span>₹{couponCartDiscount + couponDeliveryDiscount}</span>
+              </div>
+            )}
             <div className="border-t border-slate-100 pt-2.5 flex justify-between font-black text-slate-900 text-base">
               <span>To Pay</span>
-              <span>₹{totalAmount}</span>
+              <span>₹{Math.max(totalAmount, 0)}</span>
             </div>
           </div>
         </div>
@@ -780,10 +1016,15 @@ export default function Checkout() {
         >
           {placing ? (
             <Loader2 size={20} className="animate-spin" />
+          ) : !isOnline ? (
+            <>
+              <PauseCircle size={20} />
+              Store Paused
+            </>
           ) : (
             <>
               <CheckCircle2 size={20} />
-              Place Order · ₹{totalAmount}
+              Place Order · ₹{Math.max(totalAmount, 0)}
             </>
           )}
         </motion.button>

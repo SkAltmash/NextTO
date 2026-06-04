@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import {
 	  ArrowLeft, Clock, MapPin, Package, Loader2, AlertCircle,
 	  ClipboardList, CheckCircle2, ChefHat, Bike, XCircle,
-	  Phone, CreditCard, Banknote, Store, Copy, Check, FileImage, Navigation
+	  Phone, CreditCard, Banknote, Store, Copy, Check, FileImage, Navigation, Tag
 	} from 'lucide-react';
 
 // ─── Status Config ─────────────────────────────────────────────────────────────
@@ -280,7 +280,27 @@ export default function OrderDetail() {
             {order?.deliveryCharge > 0 && (
               <div className="flex justify-between text-xs font-semibold text-slate-500">
                 <span>Delivery charge</span>
-                <span className="text-orange-500">₹{order.deliveryCharge}</span>
+                <span className={order?.couponDeliveryDiscount > 0 ? 'line-through text-slate-400' : 'text-orange-500'}>
+                  ₹{order.deliveryCharge}
+                </span>
+              </div>
+            )}
+            {order?.couponCartDiscount > 0 && (
+              <div className="flex justify-between text-xs font-semibold text-green-600">
+                <span className="flex items-center gap-1"><Tag size={11} className="shrink-0" /> Coupon discount</span>
+                <span>−₹{order.couponCartDiscount}</span>
+              </div>
+            )}
+            {order?.couponDeliveryDiscount > 0 && (
+              <div className="flex justify-between text-xs font-semibold text-green-600">
+                <span className="flex items-center gap-1"><Tag size={11} className="shrink-0" /> Delivery discount</span>
+                <span>−₹{order.couponDeliveryDiscount}</span>
+              </div>
+            )}
+            {((order?.couponCartDiscount > 0) || (order?.couponDeliveryDiscount > 0)) && (
+              <div className="flex justify-between text-xs font-bold text-green-500 bg-green-50 px-3 py-1.5 rounded-xl">
+                <span>You saved</span>
+                <span>₹{(order?.couponCartDiscount ?? 0) + (order?.couponDeliveryDiscount ?? 0)}</span>
               </div>
             )}
             <div className="flex justify-between font-black text-slate-900 text-base pt-1 border-t border-slate-200">
@@ -341,6 +361,13 @@ export default function OrderDetail() {
           )}
           {order?.restaurantPhone && (
             <InfoRow icon={Phone} label="Restaurant Phone" value={order.restaurantPhone} />
+          )}
+          {order?.appliedCouponCode && (
+            <InfoRow
+              icon={Tag}
+              label="Coupon Applied"
+              value={`${order.appliedCouponCode}  ·  Saved ₹${(order?.couponCartDiscount ?? 0) + (order?.couponDeliveryDiscount ?? 0)}`}
+            />
           )}
           <InfoRow icon={Clock} label="Ordered On" value={date} />
           <InfoRow icon={ClipboardList} label="Order ID" value={id} mono />
