@@ -14,7 +14,7 @@ import { db } from '../firebase';
  *
  * @param {string} code           - Code the user typed
  * @param {number} cartSubtotal   - Sum of all item prices (before delivery)
- * @param {string} restaurantId   - ID of the restaurant ("" for multi-restaurant)
+ * @param {string|string[]} restaurantId - ID or array of IDs of the restaurant(s) in the cart
  * @param {number} deliveryCharge - Current delivery charge
  * @returns {{ valid, cartDiscount, deliveryDiscount, error, coupon }}
  */
@@ -66,10 +66,24 @@ export async function validateCoupon(code, cartSubtotal, restaurantId, deliveryC
 
   // Step 5: Check restaurant scope
   if (coupon.scope === 'specific_restaurants') {
-    if (!restaurantId || !coupon.restaurantIds.includes(restaurantId)) {
+    const ids = Array.isArray(restaurantId)
+      ? restaurantId
+      : (restaurantId ? [restaurantId] : []);
+
+    if (ids.length === 0) {
       return {
         valid: false,
-        error: 'This coupon is not valid for the selected restaurant.',
+        error: 'This coupon is not valid for the selected items.',
+        cartDiscount: 0,
+        deliveryDiscount: 0,
+      };
+    }
+
+    const hasInvalid = ids.some((id) => !coupon.restaurantIds || !coupon.restaurantIds.includes(id));
+    if (hasInvalid) {
+      return {
+        valid: false,
+        error: 'This coupon is only valid for specific restaurants. Please remove items from other restaurants to use it.',
         cartDiscount: 0,
         deliveryDiscount: 0,
       };

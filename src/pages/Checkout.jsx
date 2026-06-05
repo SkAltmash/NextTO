@@ -206,12 +206,11 @@ export default function Checkout() {
     setCouponResult(null);
     setCouponLoading(true);
     try {
-      // For multi-restaurant carts pass '' so scope:all coupons still work
-      const primaryRestaurantId = restaurantIds?.[0] ?? '';
+      // Pass the entire restaurantIds array to support scope check for all items
       const result = await validateCoupon(
         couponCode,
         totalPrice,           // cart subtotal before delivery
-        primaryRestaurantId,
+        restaurantIds,
         deliveryCharge
       );
       if (!result.valid) {
@@ -241,6 +240,32 @@ export default function Checkout() {
     if (!canOrder) return;
     setPlacing(true);
     try {
+      // ── Re-validate coupon at the time of checkout ──
+      let finalCouponCartDiscount = 0;
+      let finalCouponDeliveryDiscount = 0;
+      let finalCouponId = null;
+      let finalCouponCode = null;
+
+      if (couponResult?.coupon?.code) {
+        const checkResult = await validateCoupon(
+          couponResult.coupon.code,
+          totalPrice,
+          restaurantIds,
+          deliveryCharge
+        );
+        if (!checkResult.valid) {
+          toast.error(`Coupon error: ${checkResult.error}`);
+          setCouponResult(null); // Clear the invalid coupon
+          setCouponError(checkResult.error);
+          setPlacing(false);
+          return;
+        }
+        finalCouponCartDiscount = checkResult.cartDiscount;
+        finalCouponDeliveryDiscount = checkResult.deliveryDiscount;
+        finalCouponId = checkResult.coupon.id;
+        finalCouponCode = checkResult.coupon.code;
+      }
+
       // ── Delivery Partner from selected delivery area ────────────────────────
       const selectedDeliveryPartnerId = selectedLoc?.assignedPartnerId ?? '';
       const selectedDeliveryPartnerName = selectedLoc?.assignedPartnerName ?? '';
@@ -377,7 +402,7 @@ export default function Checkout() {
       const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
       const orderDeliveryCharge = needsDeliveryArea ? deliveryCharge : 0;
       const finalTotalAmount =
-        subtotal + orderDeliveryCharge - couponCartDiscount - couponDeliveryDiscount;
+        subtotal + orderDeliveryCharge - finalCouponCartDiscount - finalCouponDeliveryDiscount;
 
       const orderRef = await addDoc(collection(db, 'orders'), {
         // Order type
@@ -419,10 +444,10 @@ export default function Checkout() {
         deliveryPartnerEarning,
 
         // Coupon
-        appliedCouponId:   couponResult?.coupon?.id   ?? null,
-        appliedCouponCode: couponResult?.coupon?.code ?? null,
-        couponCartDiscount,
-        couponDeliveryDiscount,
+        appliedCouponId:   finalCouponId,
+        appliedCouponCode: finalCouponCode,
+        couponCartDiscount: finalCouponCartDiscount,
+        couponDeliveryDiscount: finalCouponDeliveryDiscount,
 
         // Totals
         subtotal,
@@ -615,9 +640,9 @@ export default function Checkout() {
       }
 
       // ── Increment coupon usage AFTER order is saved ──────────────────────
-      if (couponResult?.coupon?.id) {
+      if (finalCouponId) {
         try {
-          await incrementCouponUsage(couponResult.coupon.id);
+          await incrementCouponUsage(finalCouponId);
         } catch (couponErr) {
           console.warn('Coupon usage increment failed (non-critical):', couponErr);
         }
