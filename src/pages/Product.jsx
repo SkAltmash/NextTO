@@ -16,6 +16,7 @@ import { useCategories } from '../hooks/useCategories';
 
 /* ─── service tabs ─── */
 const SERVICE_TABS = [
+  { id: 'all', label: 'All', icon: Package, color: 'indigo' },
   { id: 'food', label: 'Food', icon: UtensilsCrossed, color: 'orange' },
   { id: 'grocery', label: 'Grocery', icon: ShoppingBasket, color: 'emerald' },
   { id: 'medicine', label: 'Medicine', icon: Pill, color: 'blue' },
@@ -24,6 +25,7 @@ const SERVICE_TABS = [
 ];
 
 const TAB_COLORS = {
+  indigo: { active: 'bg-indigo-500 text-white shadow-indigo-500/25', inactive: 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300' },
   orange: { active: 'bg-orange-500 text-white shadow-orange-500/25', inactive: 'bg-white border border-slate-200 text-slate-600 hover:border-orange-300' },
   emerald: { active: 'bg-emerald-500 text-white shadow-emerald-500/25', inactive: 'bg-white border border-slate-200 text-slate-600 hover:border-emerald-300' },
   blue: { active: 'bg-blue-500 text-white shadow-blue-500/25', inactive: 'bg-white border border-slate-200 text-slate-600 hover:border-blue-300' },
@@ -437,8 +439,8 @@ function PickupDropForm() {
 ═══════════════════════════════════════════ */
 export default function Product() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab') || 'food';
-  const activeTab = SERVICE_TABS.some((t) => t.id === tabParam) ? tabParam : 'food';
+  const tabParam = searchParams.get('tab') || 'all';
+  const activeTab = SERVICE_TABS.some((t) => t.id === tabParam) ? tabParam : 'all';
   const { isOnline, storeLoading } = useCart();
   const { categories } = useCategories();
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -488,6 +490,8 @@ export default function Product() {
             where('serviceType', '==', null)
           )
         );
+      } else if (activeTab === 'all') {
+        // No serviceType constraints, fetches everything
       } else {
         constraints.push(where('serviceType', '==', activeTab));
       }
@@ -534,9 +538,11 @@ export default function Product() {
   /* Map service tab → category serviceType */
   const TAB_TO_SERVICE_TYPE = { food: 'food', grocery: 'grocery', medicine: 'medicine' };
   const tabServiceType = TAB_TO_SERVICE_TYPE[activeTab];
-  const tabCategories = tabServiceType
-    ? categories.filter((c) => c.serviceType === tabServiceType)
-    : [];
+  const tabCategories = activeTab === 'all'
+    ? categories
+    : tabServiceType
+      ? categories.filter((c) => c.serviceType === tabServiceType)
+      : [];
 
   const filteredProducts = selectedCategory === 'all'
     ? products

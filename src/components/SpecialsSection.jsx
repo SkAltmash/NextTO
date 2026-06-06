@@ -17,7 +17,6 @@ export default function SpecialsSection() {
       or(
         where('isSpecial', '==', true),
         where('isSpecial', '==', 'true'),
-        where('categoryId', '==', 'curd01')
       )
     );
     getDocs(q)

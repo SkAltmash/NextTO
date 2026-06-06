@@ -13,6 +13,30 @@ const TYPE_META = {
 };
 const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
 
+const REST_TABS = [
+  {
+    id: 'restaurant',
+    label: 'Restaurant',
+    activeClass: 'bg-orange-500 text-white shadow-lg shadow-orange-200',
+    idleClass: 'bg-slate-50 border border-slate-100 text-orange-600 hover:bg-orange-50',
+    viewAllClass: 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/25',
+  },
+  {
+    id: 'medicine',
+    label: 'Medicine',
+    activeClass: 'bg-blue-500 text-white shadow-lg shadow-blue-200',
+    idleClass: 'bg-slate-50 border border-slate-100 text-blue-600 hover:bg-blue-50',
+    viewAllClass: 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/25',
+  },
+  {
+    id: 'shop',
+    label: 'Shop',
+    activeClass: 'bg-emerald-500 text-white shadow-lg shadow-emerald-200',
+    idleClass: 'bg-slate-50 border border-slate-100 text-emerald-600 hover:bg-emerald-50',
+    viewAllClass: 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25',
+  },
+];
+
 /* ─── single restaurant card ─── */
 function RestaurantCard({ restaurant }) {
   const navigate = useNavigate();
@@ -78,10 +102,11 @@ function RestaurantCard({ restaurant }) {
 
 /* ═══════════════════════════════════════════
    SECTION COMPONENT (for Home page)
-═══════════════════════════════════════════ */
+ ═══════════════════════════════════════════ */
 export function RestaurantsSection() {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('restaurant');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -93,6 +118,13 @@ export function RestaurantsSection() {
 
   if (!loading && restaurants.length === 0) return null;
 
+  const currentTab = REST_TABS.find((t) => t.id === activeTab);
+
+  const filtered = restaurants.filter((r) => {
+    const rType = r.restaurantType || 'restaurant';
+    return rType === activeTab;
+  });
+
   return (
     <section className="py-10 bg-white border-t border-slate-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -102,12 +134,21 @@ export function RestaurantsSection() {
             <h2 className="text-xl font-black text-slate-900">Stores</h2>
             <p className="text-slate-400 text-xs font-semibold mt-0.5">Order directly from your favourite places</p>
           </div>
-          <button
-            onClick={() => navigate('/restaurants')}
-            className="flex items-center gap-1 text-orange-500 font-bold text-sm cursor-pointer hover:text-orange-600 transition-colors shrink-0"
-          >
-            View All <ArrowRight size={14} />
-          </button>
+        </div>
+
+        {/* Tab strip — horizontal scroll */}
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6">
+          {REST_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-sm transition-all cursor-pointer shrink-0 ${
+                activeTab === tab.id ? tab.activeClass : tab.idleClass
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Horizontal scroll row */}
@@ -115,12 +156,36 @@ export function RestaurantsSection() {
           <div className="flex justify-center py-10">
             <Loader2 size={26} className="text-orange-400 animate-spin" />
           </div>
-        ) : (
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6">
-            {restaurants.slice(0, 10).map((r) => (
-              <RestaurantCard key={r.id} restaurant={r} />
-            ))}
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center">
+              <UtensilsCrossed size={20} className="text-slate-300" />
+            </div>
+            <p className="text-slate-400 font-semibold text-xs">
+              No stores in this category yet.
+            </p>
           </div>
+        ) : (
+          <>
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6">
+              {filtered.slice(0, 10).map((r) => (
+                <RestaurantCard key={r.id} restaurant={r} />
+              ))}
+            </div>
+
+            {/* View All */}
+            <div className="flex justify-center mt-8">
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => navigate(`/restaurants?tab=${activeTab}`)}
+                className={`flex items-center gap-2 text-white px-7 py-3 rounded-2xl font-bold text-sm shadow-lg transition-all cursor-pointer ${currentTab?.viewAllClass}`}
+              >
+                View All {currentTab?.label}
+                <ArrowRight size={16} />
+              </motion.button>
+            </div>
+          </>
         )}
       </div>
     </section>

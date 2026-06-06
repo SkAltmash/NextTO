@@ -4,7 +4,7 @@ import {
   UtensilsCrossed, Clock, MapPin, ChevronRight,
   Loader2, AlertCircle, Search, Pill, ShoppingBag,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -19,10 +19,10 @@ const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
 
 /* ── Filter tabs ── */
 const FILTERS = [
-  { label: 'All',           value: 'all',        icon: null },
-  { label: '🍽️ Restaurant', value: 'restaurant', icon: null },
-  { label: '💊 Medicine',   value: 'medicine',   icon: null },
-  { label: '🛒 Shop',       value: 'shop',       icon: null },
+  { label: 'All',        value: 'all',        icon: null },
+  { label: 'Restaurant', value: 'restaurant', icon: null },
+  { label: 'Medicine',   value: 'medicine',   icon: null },
+  { label: 'Shop',       value: 'shop',       icon: null },
 ];
 
 /* ── Restaurant Card ── */
@@ -101,7 +101,14 @@ export default function Restaurants() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const tabParam = searchParams.get('tab') || 'all';
+  const typeFilter = FILTERS.some((f) => f.value === tabParam) ? tabParam : 'all';
+
+  const setTypeFilter = (val) => {
+    setSearchParams(val === 'all' ? {} : { tab: val }, { replace: true });
+  };
 
   useEffect(() => {
     getDocs(collection(db, 'restaurants'))

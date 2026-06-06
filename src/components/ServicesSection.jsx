@@ -98,7 +98,7 @@ function MiniProductCard({ product }) {
             {discount}% OFF
           </div>
         )}
-        
+
         {/* Favorite Heart Button */}
         <button
           type="button"
@@ -110,9 +110,8 @@ function MiniProductCard({ product }) {
         >
           <Heart
             size={11}
-            className={`transition-all ${
-              isFavorite(product.id) ? 'fill-red-500 text-red-500 scale-110' : 'text-slate-400 hover:text-red-500'
-            }`}
+            className={`transition-all ${isFavorite(product.id) ? 'fill-red-500 text-red-500 scale-110' : 'text-slate-400 hover:text-red-500'
+              }`}
           />
         </button>
 
