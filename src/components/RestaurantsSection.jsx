@@ -7,8 +7,8 @@ import { db } from '../firebase';
 
 /* ── Type helpers ── */
 const TYPE_META = {
-  medicine:   { emoji: '💊', label: 'Medicine',   badge: 'bg-blue-50 text-blue-600 border-blue-100' },
-  shop:       { emoji: '🛒', label: 'Shop',       badge: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+  medicine: { emoji: '💊', label: 'Medicine', badge: 'bg-blue-50 text-blue-600 border-blue-100' },
+  shop: { emoji: '🛒', label: 'Shop', badge: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
   restaurant: { emoji: '🍽️', label: 'Restaurant', badge: 'bg-orange-50 text-orange-600 border-orange-100' },
 };
 const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
@@ -68,9 +68,8 @@ function RestaurantCard({ restaurant }) {
           </div>
         )}
         {/* open/closed badge */}
-        <div className={`absolute top-2 right-2 text-[9px] font-black px-2 py-0.5 rounded-full ${
-          restaurant.isOpen ? 'bg-emerald-500 text-white' : 'bg-red-400 text-white'
-        }`}>
+        <div className={`absolute top-2 right-2 text-[9px] font-black px-2 py-0.5 rounded-full ${restaurant.isOpen ? 'bg-emerald-500 text-white' : 'bg-red-400 text-white'
+          }`}>
           {restaurant.isOpen ? 'Open' : 'Closed'}
         </div>
         {/* type badge */}
@@ -142,9 +141,8 @@ export function RestaurantsSection() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-sm transition-all cursor-pointer shrink-0 ${
-                activeTab === tab.id ? tab.activeClass : tab.idleClass
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-sm transition-all cursor-pointer shrink-0 ${activeTab === tab.id ? tab.activeClass : tab.idleClass
+                }`}
             >
               {tab.label}
             </button>
@@ -162,7 +160,7 @@ export function RestaurantsSection() {
               <UtensilsCrossed size={20} className="text-slate-300" />
             </div>
             <p className="text-slate-400 font-semibold text-xs">
-              No stores in this category yet.
+              No Stores in this category yet.
             </p>
           </div>
         ) : (

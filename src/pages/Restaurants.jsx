@@ -11,7 +11,7 @@ import { db } from '../firebase';
 /* ── Type helpers ── */
 const TYPE_META = {
   medicine: { emoji: '💊', label: 'Medicine', badge: 'bg-blue-50 text-blue-600 border-blue-100' },
-  shop:     { emoji: '🛒', label: 'Shop',     badge: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+  shop: { emoji: '🛒', label: 'Shop', badge: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
   restaurant: { emoji: '🍽️', label: 'Restaurant', badge: 'bg-orange-50 text-orange-600 border-orange-100' },
 };
 
@@ -19,10 +19,10 @@ const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
 
 /* ── Filter tabs ── */
 const FILTERS = [
-  { label: 'All',        value: 'all',        icon: null },
+  { label: 'All', value: 'all', icon: null },
   { label: 'Restaurant', value: 'restaurant', icon: null },
-  { label: 'Medicine',   value: 'medicine',   icon: null },
-  { label: 'Shop',       value: 'shop',       icon: null },
+  { label: 'Medicine', value: 'medicine', icon: null },
+  { label: 'Shop', value: 'shop', icon: null },
 ];
 
 /* ── Restaurant Card ── */
@@ -52,9 +52,8 @@ function RestaurantCard({ restaurant }) {
           </div>
         )}
         {/* Open/Closed */}
-        <div className={`absolute top-3 right-3 text-[9px] sm:text-[10px] font-black px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full ${
-          restaurant.isOpen ? 'bg-emerald-500 text-white' : 'bg-red-400 text-white'
-        }`}>
+        <div className={`absolute top-3 right-3 text-[9px] sm:text-[10px] font-black px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full ${restaurant.isOpen ? 'bg-emerald-500 text-white' : 'bg-red-400 text-white'
+          }`}>
           {restaurant.isOpen ? 'Open' : 'Closed'}
         </div>
         {/* Type badge */}
@@ -142,7 +141,7 @@ export default function Restaurants() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search stores…"
+            placeholder="Search Stores…"
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 transition-all"
           />
         </div>
@@ -153,11 +152,10 @@ export default function Restaurants() {
             <button
               key={f.value}
               onClick={() => setTypeFilter(f.value)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-black whitespace-nowrap shrink-0 transition-all cursor-pointer border ${
-                typeFilter === f.value
-                  ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'
-              }`}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-black whitespace-nowrap shrink-0 transition-all cursor-pointer border ${typeFilter === f.value
+                ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300'
+                }`}
             >
               {f.label}
             </button>
@@ -171,7 +169,7 @@ export default function Restaurants() {
             <div className="w-14 h-14 bg-orange-50 rounded-3xl flex items-center justify-center">
               <Loader2 size={28} className="text-orange-500 animate-spin" />
             </div>
-            <p className="text-slate-400 font-semibold text-sm">Loading stores…</p>
+            <p className="text-slate-400 font-semibold text-sm">Loading Stores…</p>
           </div>
         )}
 
@@ -191,8 +189,8 @@ export default function Restaurants() {
             </div>
             <p className="text-slate-400 font-semibold text-sm">
               {search || typeFilter !== 'all'
-                ? 'No stores match your filters.'
-                : 'No stores added yet.'}
+                ? 'No Stores match your filters.'
+                : 'No Stores added yet.'}
             </p>
           </div>
         )}

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { useStoreStatus } from '../hooks/useStoreStatus';
+import { useStorestatus } from '../hooks/useStoreStatus';
 
 const CartContext = createContext(null);
 
@@ -35,7 +35,7 @@ function cartReducer(state, action) {
 }
 
 export function CartProvider({ children }) {
-  const { isOnline, loading: storeLoading } = useStoreStatus();
+  const { isOnline, loading: storeLoading } = useStorestatus();
   const [cart, dispatch] = useReducer(cartReducer, [], () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -84,8 +84,8 @@ export function CartProvider({ children }) {
   }, [isOnline, pickupOrderData]);
 
   const removeFromCart = (id) => dispatch({ type: 'REMOVE', id });
-  const updateQty    = (id, qty) => dispatch({ type: 'UPDATE_QTY', id, qty });
-  const clearCart    = () => {
+  const updateQty = (id, qty) => dispatch({ type: 'UPDATE_QTY', id, qty });
+  const clearCart = () => {
     dispatch({ type: 'CLEAR' });
     setPickupOrderDataRaw(null);
   };
@@ -142,11 +142,13 @@ export function CartProvider({ children }) {
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, removeFromCart, updateQty, clearCart, totalItems, totalPrice,
-               pickupOrderData, setPickupOrderData,
-               hasDeliveryItems,
-               favorites, toggleFavorite, isFavorite,
-               isOnline, storeLoading }}
+      value={{
+        cart, addToCart, removeFromCart, updateQty, clearCart, totalItems, totalPrice,
+        pickupOrderData, setPickupOrderData,
+        hasDeliveryItems,
+        favorites, toggleFavorite, isFavorite,
+        isOnline, storeLoading
+      }}
     >
       {children}
     </CartContext.Provider>
