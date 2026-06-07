@@ -7,6 +7,7 @@ import { db } from '../firebase';
 
 /* ── Type helpers ── */
 const TYPE_META = {
+  cafe: { emoji: '☕', label: 'Cafe', badge: 'bg-rose-50 text-rose-600 border-rose-100' },
   medicine: { emoji: '💊', label: 'Medicine', badge: 'bg-blue-50 text-blue-600 border-blue-100' },
   shop: { emoji: '🛒', label: 'Shop', badge: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
   restaurant: { emoji: '🍽️', label: 'Restaurant', badge: 'bg-orange-50 text-orange-600 border-orange-100' },
@@ -14,6 +15,13 @@ const TYPE_META = {
 const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
 
 const REST_TABS = [
+  {
+    id: 'cafe',
+    label: 'Cafe',
+    activeClass: 'bg-rose-500 text-white shadow-lg shadow-rose-200',
+    idleClass: 'bg-slate-50 border border-slate-100 text-rose-600 hover:bg-rose-50',
+    viewAllClass: 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/25',
+  },
   {
     id: 'restaurant',
     label: 'Restaurant',

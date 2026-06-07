@@ -10,6 +10,7 @@ import { db } from '../firebase';
 
 /* ── Type helpers ── */
 const TYPE_META = {
+  cafe: { emoji: '☕', label: 'Cafe', badge: 'bg-rose-50 text-rose-600 border-rose-100' },
   medicine: { emoji: '💊', label: 'Medicine', badge: 'bg-blue-50 text-blue-600 border-blue-100' },
   shop: { emoji: '🛒', label: 'Shop', badge: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
   restaurant: { emoji: '🍽️', label: 'Restaurant', badge: 'bg-orange-50 text-orange-600 border-orange-100' },
@@ -19,10 +20,11 @@ const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
 
 /* ── Filter tabs ── */
 const FILTERS = [
-  { label: 'All', value: 'all', icon: null },
-  { label: 'Restaurant', value: 'restaurant', icon: null },
-  { label: 'Medicine', value: 'medicine', icon: null },
-  { label: 'Shop', value: 'shop', icon: null },
+  { label: 'All', value: 'all' },
+  { label: 'Cafe', value: 'cafe' },
+  { label: 'Restaurant', value: 'restaurant' },
+  { label: 'Medicine', value: 'medicine' },
+  { label: 'Shop', value: 'shop' },
 ];
 
 /* ── Restaurant Card ── */

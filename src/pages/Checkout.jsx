@@ -278,6 +278,7 @@ export default function Checkout() {
       }
 
       // ── Pickup & Drop partner commission from deliveryPartners ─────────────
+      // Only the pickup location's partner handles the entire route.
       let pickupDropDetails = null;
       let pickupDropPartner = null;
 
@@ -287,16 +288,11 @@ export default function Checkout() {
           getDeliveryLocation(pickupOrderData.dropLoc),
         ]);
 
-        const [pickupPartner, dropPartner] = await Promise.all([
-          getPartner(pickupLoc.assignedPartnerId),
-          getPartner(dropLoc.assignedPartnerId),
-        ]);
+        // Only fetch the pickup partner — they handle the full route
+        pickupDropPartner = await getPartner(pickupLoc.assignedPartnerId);
 
-        pickupDropPartner = pickupPartner;
-
-        const pickupCommission = numberValue(pickupPartner?.commissionFlat);
-        const dropCommission = numberValue(dropPartner?.commissionFlat);
-        const partnerEarning = pickupCommission + dropCommission;
+        const pickupCommission = numberValue(pickupDropPartner?.commissionFlat);
+        const partnerEarning = pickupCommission; // single partner earns for the full route
         const pickupCharge = numberValue(pickupLoc.deliveryCharge ?? pickupOrderData.pickupCharge);
         const dropCharge = numberValue(dropLoc.deliveryCharge ?? pickupOrderData.dropCharge);
         const routeCharge = pickupCharge + dropCharge;
@@ -305,19 +301,14 @@ export default function Checkout() {
           pickupLocationId: pickupLoc.id ?? '',
           pickupLocationName: pickupLoc.name ?? '',
           pickupCharge,
-          pickupAssignedPartnerId: pickupLoc.assignedPartnerId ?? '',
-          pickupAssignedPartnerName: pickupPartner?.name ?? pickupLoc.assignedPartnerName ?? '',
-          pickupCommissionFlat: pickupCommission,
 
           dropLocationId: dropLoc.id ?? '',
           dropLocationName: dropLoc.name ?? '',
           dropCharge,
-          dropAssignedPartnerId: dropLoc.assignedPartnerId ?? '',
-          dropAssignedPartnerName: dropPartner?.name ?? dropLoc.assignedPartnerName ?? '',
-          dropCommissionFlat: dropCommission,
 
+          // Single partner assigned from pickup location
           assignedPartnerId: pickupLoc.assignedPartnerId ?? '',
-          assignedPartnerName: pickupPartner?.name ?? pickupLoc.assignedPartnerName ?? '',
+          assignedPartnerName: pickupDropPartner?.name ?? pickupLoc.assignedPartnerName ?? '',
           partnerEarning,
           totalCharge: routeCharge,
           note: pickupOrderData.note ?? '',
@@ -543,28 +534,78 @@ export default function Checkout() {
       }
 
       // 2️⃣  Pickup & Drop partner — assigned from pickup location
-      if (pickupDropDetails && pickupDropPartner?.telegramChatId && botToken) {
+      if (pickupDropDetails && pickupDropDetails.assignedPartnerId && botToken) {
         try {
-          const pickupDropMsg =
-            `🛵 <b>New Pickup & Drop Assignment!</b>\n` +
-            `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
-            `From: ${escapeHtml(pickupDropDetails.pickupLocationName)}  ₹${pickupDropDetails.pickupCharge}\n` +
-            `To: ${escapeHtml(pickupDropDetails.dropLocationName)}  ₹${pickupDropDetails.dropCharge}\n\n` +
-            `<b>Total Charge: ₹${pickupDropDetails.totalCharge}</b>\n` +
-            `<b>Commission: ₹${pickupDropDetails.partnerEarning}</b>\n` +
-            `Pickup commission: ₹${pickupDropDetails.pickupCommissionFlat}\n` +
-            `Drop commission: ₹${pickupDropDetails.dropCommissionFlat}\n\n` +
-            `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
-            `Address details: ${escapeHtml(address.trim())}\n` +
-            `${pickupDropDetails.note ? `Note: ${escapeHtml(pickupDropDetails.note)}\n` : ''}` +
-            `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
-            `Mobile: ${escapeHtml(mobile.trim())}`;
+          const pdPartnerSnap = await getDoc(doc(db, 'deliveryPartners', pickupDropDetails.assignedPartnerId));
+          if (pdPartnerSnap.exists()) {
+            const pdPartnerData = pdPartnerSnap.data();
+            const isPdPartnerOnline = pdPartnerData.isOnline !== false;
 
-          await sendTelegram(pickupDropPartner.telegramChatId, pickupDropMsg);
+            if (isPdPartnerOnline) {
+              const pdChatId = pdPartnerData.telegramChatId;
+              if (pdChatId) {
+                const pickupDropMsg =
+                  `🛵 <b>New Pickup & Drop Assignment!</b>\n` +
+                  `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
+                  `📍 From: ${escapeHtml(pickupDropDetails.pickupLocationName)}\n` +
+                  `📍 To: ${escapeHtml(pickupDropDetails.dropLocationName)}\n\n` +
+                  `<b>Total Charge: ₹${pickupDropDetails.totalCharge}</b>\n` +
+                  `<b>Your Commission: ₹${pickupDropDetails.partnerEarning}</b>\n\n` +
+                  `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
+                  `Address details: ${escapeHtml(address.trim())}\n` +
+                  `${pickupDropDetails.note ? `Note: ${escapeHtml(pickupDropDetails.note)}\n` : ''}` +
+                  `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
+                  `Mobile: ${escapeHtml(mobile.trim())}`;
+
+                await sendTelegram(pdChatId, pickupDropMsg);
+              }
+            } else {
+              // Partner is offline — alert admin
+              const configSnap = await getDoc(doc(db, 'config', 'telegram'));
+              const adminChatId = configSnap.exists() ? configSnap.data().adminChatId : null;
+
+              if (adminChatId) {
+                let onlinePartnersList = 'None';
+                try {
+                  const partnersSnap = await getDocs(
+                    query(collection(db, 'deliveryPartners'), where('isOnline', '==', true))
+                  );
+                  const onlinePartners = partnersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+                  if (onlinePartners.length > 0) {
+                    onlinePartnersList = onlinePartners
+                      .map((p) => `  • ${escapeHtml(p.name)} (${escapeHtml(p.mobile || p.phone || 'No Mobile')})`)
+                      .join('\n');
+                  }
+                } catch (err) {
+                  console.warn('Failed to fetch online partners:', err);
+                }
+
+                const adminMsg =
+                  `⚠️ <b>Pickup & Drop Partner Offline Alert!</b>\n\n` +
+                  `The assigned rider for this Pickup & Drop order is currently <b>offline</b>.\n\n` +
+                  `<b>Order Details:</b>\n` +
+                  `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n` +
+                  `From: <b>${escapeHtml(pickupDropDetails.pickupLocationName)}</b>\n` +
+                  `To: <b>${escapeHtml(pickupDropDetails.dropLocationName)}</b>\n` +
+                  `Total Charge: ₹${pickupDropDetails.totalCharge}\n` +
+                  `${pickupDropDetails.note ? `Note: ${escapeHtml(pickupDropDetails.note)}\n` : ''}` +
+                  `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
+                  `Mobile: ${escapeHtml(mobile.trim())}\n` +
+                  `Address: ${escapeHtml(address.trim())}\n\n` +
+                  `<b>Assigned Partner (Offline):</b>\n` +
+                  `Name: ${escapeHtml(pdPartnerData.name || 'Unknown')}\n` +
+                  `Mobile: ${escapeHtml(pdPartnerData.mobile || pdPartnerData.phone || 'N/A')}\n\n` +
+                  `<b>Online Delivery Partners:</b>\n${onlinePartnersList}`;
+
+                await sendTelegram(adminChatId, adminMsg);
+              }
+            }
+          }
         } catch (tgErr) {
           console.warn('Pickup & Drop Telegram notification skipped:', tgErr);
         }
       }
+
 
       // 3️⃣  Delivery partner
       const checkPartnerId = pickupDropOnly
@@ -722,7 +763,6 @@ export default function Checkout() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-purple-900 text-sm">Pickup &amp; Drop</p>
-                    <p className="text-purple-500 text-xs font-semibold">₹{pickupDropCharge}</p>
                   </div>
                 </div>
                 <div className="grid gap-1.5 pl-0.5">
@@ -790,19 +830,13 @@ export default function Checkout() {
               <h2 className="font-black text-slate-900 text-sm">Pickup &amp; Drop Route</h2>
             </div>
             <div className="grid gap-2">
-              <div className="flex items-center justify-between rounded-2xl bg-purple-50 border border-purple-100 px-4 py-3">
-                <span className="flex items-center gap-2 text-sm font-bold text-purple-800 min-w-0">
-                  <Navigation size={14} className="text-purple-400 shrink-0" />
-                  <span className="truncate">{pickupOrderData.pickupLoc?.name}</span>
-                </span>
-                <span className="text-xs font-black text-purple-600">₹{pickupOrderData.pickupCharge}</span>
+              <div className="flex items-center gap-2 rounded-2xl bg-purple-50 border border-purple-100 px-4 py-3">
+                <Navigation size={14} className="text-purple-400 shrink-0" />
+                <span className="text-sm font-bold text-purple-800 truncate">{pickupOrderData.pickupLoc?.name}</span>
               </div>
-              <div className="flex items-center justify-between rounded-2xl bg-purple-50 border border-purple-100 px-4 py-3">
-                <span className="flex items-center gap-2 text-sm font-bold text-purple-800 min-w-0">
-                  <MapPin size={14} className="text-purple-400 shrink-0" />
-                  <span className="truncate">{pickupOrderData.dropLoc?.name}</span>
-                </span>
-                <span className="text-xs font-black text-purple-600">₹{pickupOrderData.dropCharge}</span>
+              <div className="flex items-center gap-2 rounded-2xl bg-purple-50 border border-purple-100 px-4 py-3">
+                <MapPin size={14} className="text-purple-400 shrink-0" />
+                <span className="text-sm font-bold text-purple-800 truncate">{pickupOrderData.dropLoc?.name}</span>
               </div>
             </div>
           </div>
