@@ -113,7 +113,7 @@ function RestaurantCard({ restaurant }) {
 export function RestaurantsSection() {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('restaurant');
+  const [activeTab, setActiveTab] = useState('cafe');
   const navigate = useNavigate();
 
   useEffect(() => {
