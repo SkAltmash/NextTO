@@ -4,6 +4,7 @@ import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, LayoutGrid, AlertCircle, Search } from 'lucide-react';
+import SEO from '../components/SEO';
 
 const SERVICE_COLORS = {
   food:     'from-orange-400 to-amber-500',
@@ -41,6 +42,12 @@ export default function Categories() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 pb-28 md:pb-16">
+      <SEO
+        title="All Categories"
+        description="Browse delivery categories on NextTo in Hinganghat — including food, groceries, medicines, and pickup-drop services."
+        canonical="/categories"
+        keywords={['delivery categories', 'food delivery categories Hinganghat', 'services Hinganghat']}
+      />
       {/* Header */}
       <div className="bg-white border-b border-slate-100 px-4 sm:px-6 py-5">
         <h1 className="text-xl font-black text-slate-900 flex items-center gap-2">

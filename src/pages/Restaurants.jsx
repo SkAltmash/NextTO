@@ -7,6 +7,8 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import SEO from '../components/SEO';
+
 
 /* ── Type helpers ── */
 const TYPE_META = {
@@ -127,8 +129,16 @@ export default function Restaurants() {
     return matchSearch && matchType;
   });
 
+  const tabLabel = FILTERS.find((f) => f.value === typeFilter)?.label ?? 'All';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 pb-28 md:pb-16">
+      <SEO
+        title={typeFilter === 'all' ? 'All Stores' : `${tabLabel} Stores`}
+        description={`Browse ${typeFilter === 'all' ? 'all' : tabLabel.toLowerCase()} stores on NextTo — fast delivery of food, medicine, and more near you.`}
+        canonical="/restaurants"
+        keywords={['stores near me', 'restaurant list', 'medicine shop', tabLabel.toLowerCase()]}
+      />
       {/* Header */}
       <div className="bg-white border-b border-slate-100 px-4 sm:px-6 py-5">
         <h1 className="text-xl font-black text-slate-900">All Stores</h1>

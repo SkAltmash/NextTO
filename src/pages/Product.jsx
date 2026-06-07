@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import SEO from '../components/SEO';
 import { motion, AnimatePresence } from 'framer-motion';
 import { collection, getDocs, query, where, limit, startAfter, orderBy, or } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -548,8 +549,24 @@ export default function Product() {
     ? products
     : products.filter((p) => p.categoryId === selectedCategory);
 
+  const SEO_META = {
+    all:      { title: 'All Products',        desc: 'Browse all products available on NextTo — food, grocery, medicine and more.' },
+    food:     { title: 'Food & Restaurant',   desc: 'Order fresh food online from top restaurants on NextTo. Fast & premium delivery.' },
+    grocery:  { title: 'Groceries',           desc: 'Shop for fresh groceries and daily essentials on NextTo with fast delivery.' },
+    medicine: { title: 'Medicine & Pharmacy', desc: 'Order medicines and healthcare products online on NextTo. Quick delivery.' },
+    pickup:   { title: 'Pickup & Drop',       desc: 'Book a pickup and drop service with NextTo for safe, fast parcel delivery.' },
+    special:  { title: 'Today\'s Specials',   desc: 'Explore handpicked special offers and discounted items on NextTo today.' },
+  };
+  const seoMeta = SEO_META[activeTab] ?? SEO_META.all;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 pb-28 md:pb-16">
+      <SEO
+        title={seoMeta.title}
+        description={seoMeta.desc}
+        canonical="/product"
+        keywords={['buy online', currentTab?.label ?? 'products', 'nextto delivery']}
+      />
 
       {/* ── Store Paused Banner ── */}
       <AnimatePresence>

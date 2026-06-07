@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCategories, getCategoryName } from '../hooks/useCategories';
+import SEO from '../components/SEO';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -90,6 +91,16 @@ export default function ProductDetail() {
 
   return (
     <div className="min-h-screen bg-white pb-32 md:pb-16">
+      <SEO
+        title={product?.name}
+        description={product?.description
+          ? `${product.description} — Order ${product.name} in Hinganghat on NextTo.`
+          : `Order ${product?.name ?? 'this item'} online in Hinganghat on NextTo. Fast delivery guaranteed.`}
+        canonical={`/product/${id}`}
+        image={product?.images?.[0] || undefined}
+        type="product"
+        keywords={[product?.name ?? '', 'order online Hinganghat', restaurant?.name ?? '']}
+      />
       {/* Back button */}
       <div className="sticky top-16 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-3">
         <button

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCategories, getCategoryName } from '../hooks/useCategories';
+import SEO from '../components/SEO';
 
 /* ── Restaurant type helpers ── */
 const TYPE_META = {
@@ -168,6 +169,14 @@ export default function RestaurantDetail() {
 
   return (
     <div className="min-h-screen bg-white pb-28 md:pb-12">
+      <SEO
+        title={`${restaurant?.name} — Menu & Delivery`}
+        description={`Order from ${restaurant?.name} in Hinganghat on NextTo. ${restaurant?.address ? `Located at ${restaurant.address}.` : ''} Fast & premium delivery.`}
+        canonical={`/restaurant/${id}`}
+        image={restaurant?.banner || restaurant?.logo || undefined}
+        type="restaurant"
+        keywords={[restaurant?.name ?? '', 'Hinganghat restaurant', 'order food online']}
+      />
       {/* Hero banner */}
       <div className="relative h-52 sm:h-64 bg-gradient-to-br from-orange-100 to-amber-100 overflow-hidden">
         {restaurant?.banner ? (

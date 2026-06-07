@@ -12,6 +12,7 @@ import {
 import { useCart } from '../context/CartContext';
 import { PauseCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import SEO from '../components/SEO';
 
 const PAGE_SIZE = 15;
 
@@ -199,6 +200,13 @@ export default function CategoryDetail() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 pb-28 md:pb-16">
+      <SEO
+        title={category ? `${category.name} — Products in Hinganghat` : 'Category'}
+        description={`Shop ${category?.name ?? 'products'} online in Hinganghat on NextTo. Fast delivery at your doorstep.`}
+        canonical={`/categories/${id}`}
+        image={category?.image || undefined}
+        keywords={[category?.name ?? '', 'shop Hinganghat', category?.serviceType ?? '']}
+      />
       {/* Hero header */}
       <div className={`relative h-44 sm:h-52 bg-gradient-to-br ${headerGradient} overflow-hidden`}>
         {category?.image && (
