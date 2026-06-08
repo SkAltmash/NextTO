@@ -3,11 +3,11 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /**
- * Listens to `settings/Storestatus` in Firestore.
+ * Listens to `settings/storeStatus` in Firestore.
  * Returns { isOnline: boolean, loading: boolean }
  *
  * Firestore document shape expected:
- *   settings/Storestatus  →  { isOnline: true | false }
+ *   settings/storeStatus  →  { isOnline: true | false }
  *
  * Defaults to isOnline = true while loading so the UI
  * doesn't flash a "closed" banner on first render.
@@ -17,7 +17,7 @@ export function useStorestatus() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const ref = doc(db, 'settings', 'Storestatus');
+    const ref = doc(db, 'settings', 'storeStatus');
     const unsub = onSnapshot(
       ref,
       (snap) => {

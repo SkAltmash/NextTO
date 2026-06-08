@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Clock, Phone, MapPin, UtensilsCrossed,
-  Loader2, AlertCircle, ShoppingCart, Plus, Minus, Star, CheckCircle2
+  Loader2, AlertCircle, ShoppingCart, Plus, Minus, Star, CheckCircle2, PauseCircle
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCategories, getCategoryName } from '../hooks/useCategories';
@@ -20,7 +20,7 @@ const TYPE_META = {
 const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
 
 function ProductCard({ product }) {
-  const { addToCart, cart, updateQty } = useCart();
+  const { addToCart, cart, updateQty, isOnline } = useCart();
   const [added, setAdded] = useState(false);
   const navigate = useNavigate();
 
@@ -83,7 +83,15 @@ function ProductCard({ product }) {
 
           {/* Cart controls */}
           {product.isAvailable !== false && (
-            cartItem ? (
+            !isOnline ? (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="p-2 rounded-xl bg-slate-100 text-slate-300 cursor-not-allowed"
+                title="Store is currently paused"
+              >
+                <PauseCircle size={14} />
+              </div>
+            ) : cartItem ? (
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={(e) => { e.stopPropagation(); updateQty(product.id, cartItem.qty - 1); }}

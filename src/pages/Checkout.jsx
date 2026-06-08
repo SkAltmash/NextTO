@@ -127,6 +127,14 @@ export default function Checkout() {
     if (cart.length === 0 && !pickupOrderData) navigate('/product', { replace: true });
   }, [cart, pickupOrderData, navigate]);
 
+  // Redirect if store is paused (offline)
+  useEffect(() => {
+    if (!isOnline) {
+      toast.error('Store is currently paused. Checkout is disabled.', { id: 'store-offline' });
+      navigate('/product', { replace: true });
+    }
+  }, [isOnline, navigate]);
+
   // Redirect if not logged in
   useEffect(() => {
     if (!user) {
@@ -237,6 +245,10 @@ export default function Checkout() {
   const restaurantIds = [...new Set(cart.map((i) => i.restaurantId).filter(Boolean))];
 
   const handlePlaceOrder = async () => {
+    if (!isOnline) {
+      toast.error('Store is currently paused. We cannot accept your order right now.', { id: 'store-offline' });
+      return;
+    }
     if (!canOrder) return;
     setPlacing(true);
     try {

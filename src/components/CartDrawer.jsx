@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, ShoppingCart, Trash2, Plus, Minus, ArrowRight, Package,
-  FileImage, Pill, Bike, Navigation, MapPin
+  FileImage, Pill, Bike, Navigation, MapPin, PauseCircle
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 export default function CartDrawer({ open, onClose }) {
   const {
     cart, updateQty, clearCart, totalItems, totalPrice,
-    pickupOrderData, setPickupOrderData
+    pickupOrderData, setPickupOrderData, isOnline
   } = useCart();
   const navigate = useNavigate();
 
@@ -222,14 +222,26 @@ export default function CartDrawer({ open, onClose }) {
                   </div>
                 )}
 
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={handleCheckout}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 cursor-pointer transition-colors"
-                >
-                  Proceed to Checkout <ArrowRight size={18} />
-                </motion.button>
+                {!isOnline ? (
+                  <div className="w-full flex flex-col items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 text-amber-700 font-black text-sm">
+                      <PauseCircle size={18} className="shrink-0" />
+                      <span>Store is temporarily paused</span>
+                    </div>
+                    <p className="text-amber-600 text-xs font-semibold text-center leading-relaxed">
+                      Ordering is currently disabled. We'll be back soon!
+                    </p>
+                  </div>
+                ) : (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleCheckout}
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 cursor-pointer transition-colors"
+                  >
+                    Proceed to Checkout <ArrowRight size={18} />
+                  </motion.button>
+                )}
               </div>
             )}
           </motion.div>

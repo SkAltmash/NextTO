@@ -256,7 +256,7 @@ function LocationSelect({ label, icon: Icon, locations, value, onChange, exclude
    PICKUP & DROP FORM
 ═══════════════════════════════════════════ */
 function PickupDropForm() {
-  const { setPickupOrderData, pickupOrderData, hasDeliveryItems, cart } = useCart();
+  const { setPickupOrderData, pickupOrderData, hasDeliveryItems, cart, isOnline } = useCart();
   const [locations, setLocations] = useState([]);
   const [locLoading, setLocLoading] = useState(true);
   const [pickupLoc, setPickupLoc] = useState(null);
@@ -277,7 +277,7 @@ function PickupDropForm() {
   const dropCharge = Number(dropLoc?.deliveryCharge ?? 0);
   const totalCharge = pickupCharge + dropCharge;
   const sameLocation = pickupLoc && dropLoc && pickupLoc.id === dropLoc.id;
-  const canAdd = pickupLoc && dropLoc && !sameLocation && !hasDeliveryItems;
+  const canAdd = isOnline && pickupLoc && dropLoc && !sameLocation && !hasDeliveryItems;
 
   const buildLocationPayload = (loc) => ({
     id: loc.id,
@@ -424,7 +424,15 @@ function PickupDropForm() {
             onClick={handleAddPickupDrop}
             className="w-full bg-purple-500 hover:bg-purple-600 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 disabled:shadow-none transition-all cursor-pointer disabled:cursor-not-allowed"
           >
-            <Bike size={18} /> Add to Cart
+            {!isOnline ? (
+              <>
+                <PauseCircle size={18} /> Store Paused
+              </>
+            ) : (
+              <>
+                <Bike size={18} /> Add to Cart
+              </>
+            )}
           </motion.button>
           {!pickupLoc && <p className="text-center text-xs text-slate-400 font-semibold -mt-2">Select pickup area to continue</p>}
           {pickupLoc && !dropLoc && <p className="text-center text-xs text-slate-400 font-semibold -mt-2">Now select drop area</p>}

@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Star, Clock, ShoppingCart, Plus, Minus,
-  Loader2, AlertCircle, CheckCircle2, UtensilsCrossed, MapPin, Bike, Heart, Tag
+  Loader2, AlertCircle, CheckCircle2, UtensilsCrossed, MapPin, Bike, Heart, Tag, PauseCircle
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCategories, getCategoryName } from '../hooks/useCategories';
@@ -14,7 +14,7 @@ import SEO from '../components/SEO';
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart, cart, updateQty, pickupOrderData, toggleFavorite, isFavorite } = useCart();
+  const { addToCart, cart, updateQty, pickupOrderData, toggleFavorite, isFavorite, isOnline } = useCart();
   const { categories } = useCategories();
 
   const [product, setProduct] = useState(null);
@@ -259,7 +259,17 @@ export default function ProductDetail() {
             {/* Add to cart */}
             {product?.isAvailable !== false && (
               <div className="pt-2">
-                {pickupOrderData ? (
+                {!isOnline ? (
+                  <div className="flex items-center gap-3 bg-amber-50 border-2 border-amber-200 rounded-2xl px-4 py-3.5">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                      <PauseCircle size={16} className="text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="font-black text-amber-800 text-sm">Store is temporarily paused</p>
+                      <p className="text-amber-600 text-xs font-semibold mt-0.5">Ordering is disabled. We'll be back soon!</p>
+                    </div>
+                  </div>
+                ) : pickupOrderData ? (
                   <div className="flex items-center gap-3 bg-amber-50 border-2 border-amber-200 rounded-2xl px-4 py-3.5">
                     <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
                       <Bike size={16} className="text-amber-500" />

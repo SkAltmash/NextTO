@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UtensilsCrossed, ShoppingBasket, Pill, Bike,
-  Plus, Minus, CheckCircle2, ArrowRight, Loader2, Package, Clock, Heart
+  Plus, Minus, CheckCircle2, ArrowRight, Loader2, Package, Clock, Heart, PauseCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where, limit, or } from 'firebase/firestore';
@@ -55,7 +55,7 @@ const TABS = [
 
 /* ─── mini product card ─── */
 function MiniProductCard({ product }) {
-  const { addToCart, cart, updateQty, pickupOrderData, toggleFavorite, isFavorite } = useCart();
+  const { addToCart, cart, updateQty, pickupOrderData, toggleFavorite, isFavorite, isOnline } = useCart();
   const navigate = useNavigate();
   const [added, setAdded] = useState(false);
 
@@ -142,7 +142,15 @@ function MiniProductCard({ product }) {
           </div>
 
           {product.isAvailable !== false && (
-            pickupOrderData ? (
+            !isOnline ? (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="p-1.5 rounded-xl bg-slate-100 text-slate-300 cursor-not-allowed"
+                title="Store paused"
+              >
+                <PauseCircle size={13} />
+              </div>
+            ) : pickupOrderData ? (
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="p-1.5 rounded-xl bg-slate-100 text-slate-400 cursor-not-allowed"

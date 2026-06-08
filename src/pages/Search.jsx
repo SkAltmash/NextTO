@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search as SearchIcon, X, Flame, UtensilsCrossed,
-  Clock, MapPin, ChevronRight, Loader2, Plus, Minus, CheckCircle2, Package, MessageSquare, Heart, LayoutGrid
+  Clock, MapPin, ChevronRight, Loader2, Plus, Minus, CheckCircle2, Package, MessageSquare, Heart, LayoutGrid, PauseCircle
 } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
@@ -13,7 +13,7 @@ const POPULAR = ['Biryani', 'Pizza', 'Burger', 'Momos', 'Grocery', 'Medicine'];
 
 /* ─── product result card ─── */
 function ProductResult({ product }) {
-  const { addToCart, cart, updateQty, toggleFavorite, isFavorite } = useCart();
+  const { addToCart, cart, updateQty, toggleFavorite, isFavorite, isOnline } = useCart();
   const navigate = useNavigate();
   const [added, setAdded] = useState(false);
   const cartItem = cart.find((i) => i.id === product.id);
@@ -85,7 +85,11 @@ function ProductResult({ product }) {
       </div>
       {product.isAvailable !== false && (
         <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-          {cartItem ? (
+          {!isOnline ? (
+            <div className="p-2 rounded-xl bg-slate-100 text-slate-300 cursor-not-allowed" title="Store paused">
+              <PauseCircle size={14} />
+            </div>
+          ) : cartItem ? (
             <div className="flex items-center gap-1">
               <button onClick={(e) => { e.stopPropagation(); updateQty(product.id, cartItem.qty - 1); }}
                 className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all cursor-pointer">

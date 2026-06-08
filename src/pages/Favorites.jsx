@@ -4,12 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import {
   Heart, UtensilsCrossed, Clock, Plus, Minus,
-  CheckCircle2, ShoppingBasket, Pill, Bike, ArrowLeft, ArrowRight, Trash2
+  CheckCircle2, ShoppingBasket, Pill, Bike, ArrowLeft, ArrowRight, Trash2, PauseCircle
 } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Favorites() {
-  const { favorites, toggleFavorite, addToCart, cart, updateQty, pickupOrderData } = useCart();
+  const { favorites, toggleFavorite, addToCart, cart, updateQty, pickupOrderData, isOnline } = useCart();
   const navigate = useNavigate();
   const [addedId, setAddedId] = useState(null);
 
@@ -168,7 +168,15 @@ export default function Favorites() {
                       </div>
 
                       {product.isAvailable !== false && (
-                        pickupOrderData ? (
+                        !isOnline ? (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-xl bg-slate-100 text-slate-300 cursor-not-allowed"
+                            title="Store is paused"
+                          >
+                            <PauseCircle size={13} />
+                          </div>
+                        ) : pickupOrderData ? (
                           <div
                             onClick={(e) => e.stopPropagation()}
                             className="p-1.5 rounded-xl bg-slate-100 text-slate-400 cursor-not-allowed"
