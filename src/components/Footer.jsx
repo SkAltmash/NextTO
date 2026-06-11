@@ -113,7 +113,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center gap-3">
                 <Mail size={16} className="text-slate-400 shrink-0" />
-                <span className="break-all">support@foodexpress.com</span>
+                <span className="break-all">rudrakshmakre@gmail.com</span>
               </li>
             </ul>
           </div>
@@ -141,8 +141,8 @@ export default function Footer() {
           </div>
 
           <div className="flex items-center gap-6 text-[11px] sm:text-xs font-bold text-slate-400">
-            <span className="hover:text-slate-600 cursor-pointer transition-colors">Terms of Service</span>
-            <span className="hover:text-slate-600 cursor-pointer transition-colors">Privacy Policy</span>
+            <Link to="/terms-of-service" className="hover:text-slate-600 transition-colors">Terms of Service</Link>
+            <Link to="/privacy-policy" className="hover:text-slate-600 transition-colors">Privacy Policy</Link>
           </div>
         </div>
       </div>

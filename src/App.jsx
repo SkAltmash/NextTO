@@ -16,6 +16,8 @@ import Checkout from './pages/Checkout';
 import OrderDetail from './pages/OrderDetail';
 import Categories from './pages/Categories';
 import CategoryDetail from './pages/CategoryDetail';
+import PrivacyPolicy from './pages/PolicyPrivacy';
+import TermsOfService from './pages/PolicyTerms';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 
@@ -76,6 +78,8 @@ function AppLayout() {
           <Route path="/order/:id" element={<OrderDetail />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/categories/:id" element={<CategoryDetail />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
         </Routes>
       </main>
     </>
