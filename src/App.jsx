@@ -18,6 +18,7 @@ import Categories from './pages/Categories';
 import CategoryDetail from './pages/CategoryDetail';
 import PrivacyPolicy from './pages/PolicyPrivacy';
 import TermsOfService from './pages/PolicyTerms';
+import DeleteAccount from './pages/DeleteAccount';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 
@@ -80,6 +81,7 @@ function AppLayout() {
           <Route path="/categories/:id" element={<CategoryDetail />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/delete-account" element={<DeleteAccount />} />
         </Routes>
       </main>
     </>
