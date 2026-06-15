@@ -21,8 +21,6 @@ function Home() {
             <ServicesSection />
             <CategoriesSection />
             <RestaurantsSection />
-            <WhyChooseUs />
-            <WhatsAppCTA />
             <Footer />
         </div>
     )
