@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Star, Clock, ShoppingCart, Plus, Minus,
-  Loader2, AlertCircle, CheckCircle2, UtensilsCrossed, MapPin, Bike, Heart, Tag, PauseCircle
+  Loader2, AlertCircle, CheckCircle2, UtensilsCrossed, MapPin, Bike, Heart, Tag, PauseCircle, Lock
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCategories, getCategoryName } from '../hooks/useCategories';
@@ -67,7 +67,12 @@ export default function ProductDetail() {
     ? Math.round(((product.price - product.discountPrice) / product.price) * 100)
     : null;
 
+  const isUnavailable = product?.isAvailable === false;
+  const isRestaurantClosed = restaurant?.isOpen === false;
+  const canAddToCart = !isUnavailable && !isRestaurantClosed;
+
   const handleAddToCart = () => {
+    if (!canAddToCart) return;
     addToCart(product);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -126,7 +131,7 @@ export default function ProductDetail() {
                 <img
                   src={images[activeImg]}
                   alt={product.name}
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover transition-all duration-500 ${isUnavailable ? 'grayscale' : ''}`}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -154,11 +159,17 @@ export default function ProductDetail() {
                 />
               </button>
 
-              {!product?.isAvailable && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-3xl">
-                  <span className="bg-white text-slate-700 font-black px-5 py-2.5 rounded-full text-sm">
-                    Currently Unavailable
-                  </span>
+              {isUnavailable && (
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/85 via-slate-800/50 to-slate-700/20 flex flex-col items-center justify-center gap-3 rounded-3xl">
+                  <div className="w-14 h-14 rounded-3xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center shadow-2xl">
+                    <AlertCircle size={28} className="text-white" />
+                  </div>
+                  <div className="text-center">
+                    <span className="block bg-white/95 backdrop-blur-sm text-slate-800 font-black px-5 py-2 rounded-full text-sm uppercase tracking-widest shadow-2xl border border-white/60">
+                      Out of Stock
+                    </span>
+                    <p className="text-white/70 text-xs font-semibold mt-2">This item is currently unavailable</p>
+                  </div>
                 </div>
               )}
             </motion.div>
@@ -237,27 +248,54 @@ export default function ProductDetail() {
 
             {/* Restaurant card */}
             {restaurant && (
-              <button
-                onClick={() => navigate(`/restaurant/${restaurant.id}`)}
-                className="w-full flex items-center gap-3 bg-slate-50 hover:bg-orange-50 border border-slate-200 hover:border-orange-200 p-4 rounded-2xl transition-all cursor-pointer text-left"
-              >
-                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
-                  <UtensilsCrossed size={18} className="text-orange-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-black text-slate-800 text-sm truncate">{restaurant.name}</p>
-                  {restaurant.address && (
-                    <p className="text-slate-400 text-xs font-medium flex items-center gap-1 mt-0.5">
-                      <MapPin size={10} /> {restaurant.address}
-                    </p>
-                  )}
-                </div>
-                <span className="text-orange-500 text-xs font-bold shrink-0">View →</span>
-              </button>
+              <>
+                <button
+                  onClick={() => navigate(`/restaurant/${restaurant.id}`)}
+                  className="w-full flex items-center gap-3 bg-slate-50 hover:bg-orange-50 border border-slate-200 hover:border-orange-200 p-4 rounded-2xl transition-all cursor-pointer text-left"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
+                    <UtensilsCrossed size={18} className="text-orange-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-slate-800 text-sm truncate">{restaurant.name}</p>
+                    {restaurant.address && (
+                      <p className="text-slate-400 text-xs font-medium flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} /> {restaurant.address}
+                      </p>
+                    )}
+                  </div>
+                  <span className={`text-xs font-bold shrink-0 ${
+                    isRestaurantClosed ? 'text-red-500' : 'text-orange-500'
+                  }`}>
+                    {isRestaurantClosed ? '● Closed' : 'View →'}
+                  </span>
+                </button>
+
+                {/* Closed restaurant banner */}
+                {isRestaurantClosed && (
+                  <div className="relative overflow-hidden rounded-2xl">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-red-500 to-rose-600" />
+                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)', backgroundSize: '8px 8px' }} />
+                    <div className="relative flex items-center gap-3 px-4 py-4">
+                      <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center shrink-0">
+                        <Lock size={18} className="text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-black text-white text-sm">Restaurant is Currently Closed</p>
+                        <p className="text-red-100 text-xs font-semibold mt-0.5">Ordering is disabled right now. Check back soon!</p>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1.5 bg-white/15 border border-white/25 px-2.5 py-1 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-200 animate-pulse" />
+                        <span className="text-white text-[10px] font-black uppercase tracking-wider">Closed</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Add to cart */}
-            {product?.isAvailable !== false && (
+            {canAddToCart ? (
               <div className="pt-2">
                 {!isOnline ? (
                   <div className="flex items-center gap-3 bg-amber-50 border-2 border-amber-200 rounded-2xl px-4 py-3.5">
@@ -337,7 +375,7 @@ export default function ProductDetail() {
                   </motion.button>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 

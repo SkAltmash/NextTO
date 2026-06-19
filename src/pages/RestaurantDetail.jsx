@@ -5,11 +5,13 @@ import { db } from '../firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Clock, Phone, MapPin, UtensilsCrossed,
-  Loader2, AlertCircle, ShoppingCart, Plus, Minus, Star, CheckCircle2, PauseCircle
+  Loader2, AlertCircle, ShoppingCart, Plus, Minus, Star,
+  CheckCircle2, PauseCircle, Lock
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCategories, getCategoryName } from '../hooks/useCategories';
 import SEO from '../components/SEO';
+import ProductCard from '../components/ProductCard';
 
 /* ── Restaurant type helpers ── */
 const TYPE_META = {
@@ -18,112 +20,6 @@ const TYPE_META = {
   restaurant: { emoji: '🍽️', label: 'Restaurant', cls: 'bg-orange-50 text-orange-600 border-orange-100' },
 };
 const getTypeMeta = (type) => TYPE_META[type] ?? TYPE_META.restaurant;
-
-function ProductCard({ product }) {
-  const { addToCart, cart, updateQty, isOnline } = useCart();
-  const [added, setAdded] = useState(false);
-  const navigate = useNavigate();
-
-  const cartItem = cart.find((i) => i.id === product.id);
-  const discount = product.price && product.discountPrice
-    ? Math.round(((product.price - product.discountPrice) / product.price) * 100)
-    : null;
-
-  const handleAdd = (e) => {
-    e.stopPropagation();
-    addToCart(product);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -3 }}
-      className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-100/40 overflow-hidden cursor-pointer group transition-shadow"
-      onClick={() => navigate(`/product/${product.id}`)}
-    >
-      {/* Image */}
-      <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
-        {product.images?.[0] ? (
-          <img
-            src={product.images[0]}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300">
-            <UtensilsCrossed size={40} />
-          </div>
-        )}
-        {discount && (
-          <div className="absolute top-2 left-2 bg-orange-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow">
-            {discount}% OFF
-          </div>
-        )}
-        {!product.isAvailable && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <span className="bg-white/90 text-slate-700 text-xs font-bold px-3 py-1 rounded-full">Unavailable</span>
-          </div>
-        )}
-      </div>
-
-      <div className="p-3">
-        <h3 className="font-black text-slate-900 text-sm leading-tight line-clamp-1">{product.name}</h3>
-        <p className="text-slate-400 text-xs mt-0.5 line-clamp-1 font-medium">{product.description}</p>
-
-        <div className="flex items-center justify-between mt-3">
-          <div>
-            <span className="text-orange-500 font-black text-base">₹{product.discountPrice ?? product.price}</span>
-            {product.discountPrice && product.price && (
-              <span className="text-slate-400 text-xs font-semibold line-through ml-1">₹{product.price}</span>
-            )}
-          </div>
-
-          {/* Cart controls */}
-          {product.isAvailable !== false && (
-            !isOnline ? (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="p-2 rounded-xl bg-slate-100 text-slate-300 cursor-not-allowed"
-                title="Store is currently paused"
-              >
-                <PauseCircle size={14} />
-              </div>
-            ) : cartItem ? (
-              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={(e) => { e.stopPropagation(); updateQty(product.id, cartItem.qty - 1); }}
-                  className="w-6 h-6 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-red-50 hover:text-red-500 transition-all cursor-pointer"
-                >
-                  <Minus size={10} />
-                </button>
-                <span className="font-black text-slate-800 text-xs w-4 text-center">{cartItem.qty}</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); updateQty(product.id, cartItem.qty + 1); }}
-                  className="w-6 h-6 rounded-lg bg-orange-500 flex items-center justify-center text-white hover:bg-orange-600 transition-all cursor-pointer"
-                >
-                  <Plus size={10} />
-                </button>
-              </div>
-            ) : (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleAdd}
-                className={`p-2 rounded-xl shadow-md transition-colors cursor-pointer ${added ? 'bg-emerald-500 shadow-emerald-400/20' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/20'
-                  } text-white`}
-              >
-                {added ? <CheckCircle2 size={14} /> : <Plus size={14} />}
-              </motion.button>
-            )
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 export default function RestaurantDetail() {
   const { id } = useParams();
@@ -217,6 +113,29 @@ export default function RestaurantDetail() {
         </div>
       </div>
 
+      {/* Closed banner */}
+      {restaurant?.isOpen === false && (
+        <div className="relative overflow-hidden bg-gradient-to-r from-red-600 via-red-500 to-rose-600">
+          {/* subtle pattern */}
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)', backgroundSize: '8px 8px' }} />
+          <div className="relative max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center shrink-0">
+              <Lock size={18} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-black text-white text-sm tracking-wide">Restaurant is Currently Closed</p>
+              <p className="text-red-100 text-xs font-semibold mt-0.5 leading-relaxed">
+                Ordering is disabled right now. We'll be back — check again soon!
+              </p>
+            </div>
+            <div className="shrink-0 flex items-center gap-1.5 bg-white/15 border border-white/25 backdrop-blur-sm px-3 py-1.5 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-200 animate-pulse" />
+              <span className="text-white text-[10px] font-black uppercase tracking-wider">Closed</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Info bar */}
       <div className="bg-white border-b border-slate-100 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex flex-wrap gap-4 text-sm text-slate-500 font-semibold">
@@ -283,7 +202,7 @@ export default function RestaurantDetail() {
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {filtered.map((p) => (
-                <ProductCard key={p.id} product={p} />
+                <ProductCard key={p.id} product={p} isRestaurantClosed={restaurant?.isOpen === false} />
               ))}
             </div>
           </>

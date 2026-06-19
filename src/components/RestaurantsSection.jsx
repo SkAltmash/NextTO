@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { UtensilsCrossed, Clock, MapPin, ChevronRight, Loader2, ArrowRight } from 'lucide-react';
+import { UtensilsCrossed, Clock, MapPin, ChevronRight, Loader2, ArrowRight, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -49,6 +49,7 @@ const REST_TABS = [
 function RestaurantCard({ restaurant }) {
   const navigate = useNavigate();
   const meta = getTypeMeta(restaurant.restaurantType);
+  const isClosed = restaurant.isOpen === false;
 
   return (
     <motion.div
@@ -65,28 +66,39 @@ function RestaurantCard({ restaurant }) {
           <img
             src={restaurant.banner}
             alt={restaurant.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500
+              ${isClosed ? 'grayscale' : ''}`}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className={`w-full h-full flex items-center justify-center ${isClosed ? 'grayscale' : ''}`}>
             {restaurant.logo
               ? <img src={restaurant.logo} alt="" className="w-12 h-12 object-contain" />
               : <UtensilsCrossed size={28} className="text-orange-300" />
             }
           </div>
         )}
+
         {/* open/closed badge */}
-        <div className={`absolute top-2 right-2 text-[9px] font-black px-2 py-0.5 rounded-full ${restaurant.isOpen ? 'bg-emerald-500 text-white' : 'bg-red-400 text-white'
-          }`}>
+        <div className={`absolute top-2 right-2 text-[9px] font-black px-2 py-0.5 rounded-full ${restaurant.isOpen ? 'bg-emerald-500 text-white' : 'bg-red-400 text-white'}`}>
           {restaurant.isOpen ? 'Open' : 'Closed'}
         </div>
         {/* type badge */}
         <div className={`absolute top-2 left-2 text-[9px] font-black px-2 py-0.5 rounded-full border ${meta.badge}`}>
           {meta.emoji} {meta.label}
         </div>
+
+        {/* Closed overlay */}
+        {isClosed && (
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-slate-800/30 to-transparent flex items-end justify-center pb-3">
+            <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-sm text-slate-700 text-[9px] font-black px-3 py-1.5 rounded-full shadow-lg border border-white/60 uppercase tracking-widest">
+              <Lock size={9} />
+              Currently Closed
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="p-3">
+      <div className={`p-3 ${isClosed ? 'opacity-60' : ''}`}>
         <h3 className="font-black text-slate-900 text-sm line-clamp-1">{restaurant.name}</h3>
         {restaurant.address && (
           <p className="flex items-center gap-1 text-slate-400 text-[11px] font-medium mt-0.5 line-clamp-1">
@@ -98,8 +110,8 @@ function RestaurantCard({ restaurant }) {
             <Clock size={10} className="text-orange-400" />
             {restaurant.deliveryTime ?? 'N/A'}
           </span>
-          <span className="text-orange-500 text-[11px] font-bold flex items-center gap-0.5">
-            Menu <ChevronRight size={11} />
+          <span className={`text-[11px] font-bold flex items-center gap-0.5 ${isClosed ? 'text-slate-400' : 'text-orange-500'}`}>
+            {isClosed ? 'View menu' : 'Menu'} <ChevronRight size={11} />
           </span>
         </div>
       </div>

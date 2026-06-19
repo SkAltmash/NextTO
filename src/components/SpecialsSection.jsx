@@ -4,7 +4,7 @@ import { Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where, or } from 'firebase/firestore';
 import { db } from '../firebase';
-import { ProductCard } from '../pages/Product';
+import ProductCard from '../components/ProductCard';
 
 export default function SpecialsSection() {
   const [specials, setSpecials] = useState([]);

@@ -1,19 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin, ChevronDown, Loader2, CheckCircle2, AlertCircle,
   ShoppingBag, ArrowLeft, Package, Truck, Tag, Wallet, Banknote, Phone,
-  Bike, Navigation, PauseCircle
+  Bike, Navigation, PauseCircle,
 } from 'lucide-react';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc, updateDoc, increment } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { validateCoupon, incrementCouponUsage } from '../utils/couponUtils';
+import { useCart } from '../context/CartContext';
+import { useCheckout } from '../hooks/useCheckout';
 
-// ─── Delivery Location Dropdown ──────────────────────────────────────────────
+// ─── Delivery Location Dropdown ───────────────────────────────────────────────
 function LocationDropdown({ locations, selected, onSelect, disabled }) {
   const [open, setOpen] = useState(false);
 
@@ -77,7 +73,7 @@ function LocationDropdown({ locations, selected, onSelect, disabled }) {
   );
 }
 
-// ─── Order Summary Item ───────────────────────────────────────────────────────
+// ─── Order Summary Item ────────────────────────────────────────────────────────
 function SummaryItem({ item }) {
   const price = item.discountPrice ?? item.price;
   return (
@@ -104,613 +100,41 @@ function SummaryItem({ item }) {
 
 // ─── Main Checkout Page ───────────────────────────────────────────────────────
 export default function Checkout() {
-  const { cart, totalPrice, clearCart, pickupOrderData, isOnline } = useCart();
-  const { user } = useAuth();
   const navigate = useNavigate();
-
-  const [address, setAddress] = useState('');
-  const [mobile, setMobile] = useState('');
-  const [locations, setLocations] = useState([]);
-  const [selectedLoc, setSelectedLoc] = useState(null);
-  const [locLoading, setLocLoading] = useState(true);
-  const [placing, setPlacing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('cod');
-
-  // ── Coupon state ──────────────────────────────────────────────────────────
-  const [couponCode, setCouponCode] = useState('');
-  const [couponResult, setCouponResult] = useState(null);   // { valid, coupon, cartDiscount, deliveryDiscount }
-  const [couponError, setCouponError] = useState('');
-  const [couponLoading, setCouponLoading] = useState(false);
-
-  // Redirect if cart is empty AND no pickup-drop request
-  useEffect(() => {
-    if (cart.length === 0 && !pickupOrderData) navigate('/product', { replace: true });
-  }, [cart, pickupOrderData, navigate]);
-
-  // Redirect if store is paused (offline)
-  useEffect(() => {
-    if (!isOnline) {
-      toast.error('Store is currently paused. Checkout is disabled.', { id: 'store-offline' });
-      navigate('/product', { replace: true });
-    }
-  }, [isOnline, navigate]);
-
-  // Redirect if not logged in
-  useEffect(() => {
-    if (!user) {
-      toast.error('Please login to checkout');
-      navigate('/auth', { replace: true });
-    }
-  }, [user, navigate]);
-
-  // Fetch active delivery locations
-  useEffect(() => {
-    const fetch = async () => {
-      setLocLoading(true);
-      try {
-        const q = query(
-          collection(db, 'deliveryLocations'),
-          where('isActive', '==', true)
-        );
-        const snap = await getDocs(q);
-        setLocations(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      } catch (e) {
-        console.error(e);
-        toast.error('Could not load delivery areas');
-      } finally {
-        setLocLoading(false);
-      }
-    };
-    fetch();
-  }, []);
-
-  const isPickupDropOrder = !!pickupOrderData;
-  const needsDeliveryArea = cart.length > 0;
-
-  const pickupDropCharge = Number(pickupOrderData?.totalCharge ?? 0);
-  const deliveryCharge = Number(selectedLoc?.deliveryCharge ?? 0);
-
-  // Coupon discounts (default 0 when none applied)
-  const couponCartDiscount     = couponResult?.cartDiscount     ?? 0;
-  const couponDeliveryDiscount = couponResult?.deliveryDiscount ?? 0;
-
-  const totalAmount =
-    totalPrice +
-    (needsDeliveryArea ? deliveryCharge : 0) +
-    pickupDropCharge -
-    couponCartDiscount -
-    couponDeliveryDiscount;
-
-  const belowMin =
-    cart.length > 0 &&
-    selectedLoc && totalPrice < (selectedLoc.minOrder ?? 0);
-
-  const canOrder =
-    isOnline &&
-    (!needsDeliveryArea || selectedLoc) &&
-    address.trim().length > 0 &&
-    mobile.trim().length >= 10 &&
-    paymentMethod === 'cod' &&
-    !belowMin &&
-    !placing;
-
-  const getPartner = async (partnerId) => {
-    if (!partnerId) return null;
-    const snap = await getDoc(doc(db, 'deliveryPartners', partnerId));
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
-  };
-
-  const getDeliveryLocation = async (location) => {
-    if (!location?.id) return location ?? {};
-    const snap = await getDoc(doc(db, 'deliveryLocations', location.id));
-    return snap.exists() ? { id: snap.id, ...snap.data() } : location;
-  };
-
-  const numberValue = (value) => Number(value ?? 0) || 0;
-
-  // ── Coupon handlers ───────────────────────────────────────────────────────
-  const handleApplyCoupon = async () => {
-    setCouponError('');
-    setCouponResult(null);
-    setCouponLoading(true);
-    try {
-      // Pass the entire restaurantIds array to support scope check for all items
-      const result = await validateCoupon(
-        couponCode,
-        totalPrice,           // cart subtotal before delivery
-        restaurantIds,
-        deliveryCharge
-      );
-      if (!result.valid) {
-        setCouponError(result.error);
-      } else {
-        setCouponResult(result);
-        toast.success(`Coupon "${result.coupon.code}" applied! 🎉`);
-      }
-    } catch (err) {
-      console.error('Coupon validation error:', err);
-      setCouponError('Could not validate coupon. Please try again.');
-    } finally {
-      setCouponLoading(false);
-    }
-  };
-
-  const handleRemoveCoupon = () => {
-    setCouponResult(null);
-    setCouponCode('');
-    setCouponError('');
-  };
-
-  // Unique restaurant IDs used both for restaurant fetching AND coupon scope checks
-  const restaurantIds = [...new Set(cart.map((i) => i.restaurantId).filter(Boolean))];
-
-  const handlePlaceOrder = async () => {
-    if (!isOnline) {
-      toast.error('Store is currently paused. We cannot accept your order right now.', { id: 'store-offline' });
-      return;
-    }
-    if (!canOrder) return;
-    setPlacing(true);
-    try {
-      // ── Re-validate coupon at the time of checkout ──
-      let finalCouponCartDiscount = 0;
-      let finalCouponDeliveryDiscount = 0;
-      let finalCouponId = null;
-      let finalCouponCode = null;
-
-      if (couponResult?.coupon?.code) {
-        const checkResult = await validateCoupon(
-          couponResult.coupon.code,
-          totalPrice,
-          restaurantIds,
-          deliveryCharge
-        );
-        if (!checkResult.valid) {
-          toast.error(`Coupon error: ${checkResult.error}`);
-          setCouponResult(null); // Clear the invalid coupon
-          setCouponError(checkResult.error);
-          setPlacing(false);
-          return;
-        }
-        finalCouponCartDiscount = checkResult.cartDiscount;
-        finalCouponDeliveryDiscount = checkResult.deliveryDiscount;
-        finalCouponId = checkResult.coupon.id;
-        finalCouponCode = checkResult.coupon.code;
-      }
-
-      // ── Delivery Partner from selected delivery area ────────────────────────
-      const selectedDeliveryPartnerId = selectedLoc?.assignedPartnerId ?? '';
-      const selectedDeliveryPartnerName = selectedLoc?.assignedPartnerName ?? '';
-      let selectedDeliveryPartnerEarning = 0;
-      let isPartnerOnline = true;
-      if (selectedDeliveryPartnerId) {
-        const partner = await getPartner(selectedDeliveryPartnerId);
-        selectedDeliveryPartnerEarning = numberValue(partner?.commissionFlat);
-        isPartnerOnline = partner ? (partner.isOnline !== false) : true;
-      }
-
-      // ── Pickup & Drop partner commission from deliveryPartners ─────────────
-      // Only the pickup location's partner handles the entire route.
-      let pickupDropDetails = null;
-      let pickupDropPartner = null;
-
-      if (pickupOrderData) {
-        const [pickupLoc, dropLoc] = await Promise.all([
-          getDeliveryLocation(pickupOrderData.pickupLoc),
-          getDeliveryLocation(pickupOrderData.dropLoc),
-        ]);
-
-        // Only fetch the pickup partner — they handle the full route
-        pickupDropPartner = await getPartner(pickupLoc.assignedPartnerId);
-
-        const pickupCommission = numberValue(pickupDropPartner?.commissionFlat);
-        const partnerEarning = pickupCommission; // single partner earns for the full route
-        const pickupCharge = numberValue(pickupLoc.deliveryCharge ?? pickupOrderData.pickupCharge);
-        const dropCharge = numberValue(dropLoc.deliveryCharge ?? pickupOrderData.dropCharge);
-        const routeCharge = pickupCharge + dropCharge;
-
-        pickupDropDetails = {
-          pickupLocationId: pickupLoc.id ?? '',
-          pickupLocationName: pickupLoc.name ?? '',
-          pickupCharge,
-
-          dropLocationId: dropLoc.id ?? '',
-          dropLocationName: dropLoc.name ?? '',
-          dropCharge,
-
-          // Single partner assigned from pickup location
-          assignedPartnerId: pickupLoc.assignedPartnerId ?? '',
-          assignedPartnerName: pickupDropPartner?.name ?? pickupLoc.assignedPartnerName ?? '',
-          partnerEarning,
-          totalCharge: routeCharge,
-          note: pickupOrderData.note ?? '',
-        };
-      }
-
-      const pickupDropOnly = pickupDropDetails && !needsDeliveryArea;
-      const deliveryPartnerId = pickupDropOnly
-        ? pickupDropDetails.assignedPartnerId
-        : (isPartnerOnline ? selectedDeliveryPartnerId : '');
-      const deliveryPartnerName = pickupDropOnly
-        ? pickupDropDetails.assignedPartnerName
-        : (isPartnerOnline ? selectedDeliveryPartnerName : '');
-      const deliveryPartnerEarning = pickupDropOnly
-        ? pickupDropDetails.partnerEarning
-        : (isPartnerOnline ? selectedDeliveryPartnerEarning : 0);
-
-      // Unique restaurant IDs across all cart items (for admin reference) — already computed above
-
-      // Fetch ALL unique restaurants in parallel so each item gets its own commission rate & phone
-      const restaurantDataMap = {}; // { [restaurantId]: { phone, commissionRate } }
-      if (restaurantIds.length > 0) {
-        try {
-          const restSnaps = await Promise.all(
-            restaurantIds.map((rId) => getDoc(doc(db, 'restaurants', rId)))
-          );
-          restSnaps.forEach((snap) => {
-            if (snap.exists()) {
-              const d = snap.data();
-              restaurantDataMap[snap.id] = {
-                name: d.name ?? '',
-                phone: d.phone ?? '',
-                logo: d.logo ?? '',
-                commissionRate: Number(d.commissionRate ?? 0),
-              };
-            }
-          });
-        } catch (err) {
-          console.warn('Error fetching restaurant data:', err);
-        }
-      }
-
-      // Keep the first restaurant's top-level fields for backward compat
-      const firstRestData = restaurantDataMap[restaurantIds[0]] ?? { name: '', phone: '', logo: '', commissionRate: 0 };
-      const restaurantPhone = firstRestData.phone;
-      const restaurantName = firstRestData.name;
-      const restaurantLogo = firstRestData.logo;
-
-      const pickupDropItem = pickupDropDetails
-        ? [{
-          productId: 'pickup-drop',
-          productName: 'Pickup & Drop',
-          quantity: 1,
-          price: pickupDropDetails.totalCharge,
-          image: '',
-          restaurantId: '',
-          serviceType: 'pickup_drop',
-        }]
-        : [];
-
-      // Each cart item gets the commissionRate and phone of its own restaurant
-      const orderItems = [
-        ...cart.map((i) => {
-          const rData = restaurantDataMap[i.restaurantId] ?? null;
-          return {
-            productId: i.id,
-            productName: i.name,
-            quantity: i.qty,
-            price: i.discountPrice ?? i.price,
-            image: i.images?.[0] ?? '',
-            restaurantId: i.restaurantId ?? '',
-            restaurantName: rData ? rData.name : '',
-            restaurantLogo: rData ? rData.logo : '',
-            restaurantPhone: rData ? rData.phone : '',
-            commissionRate: rData ? rData.commissionRate : 0,
-            deliveryArea: selectedLoc?.name ?? '',
-          };
-        }),
-        ...pickupDropItem,
-      ];
-
-      const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
-      const orderDeliveryCharge = needsDeliveryArea ? deliveryCharge : 0;
-      const finalTotalAmount =
-        subtotal + orderDeliveryCharge - finalCouponCartDiscount - finalCouponDeliveryDiscount;
-
-      const orderRef = await addDoc(collection(db, 'orders'), {
-        // Order type
-        isPrescriptionOrder: false,
-        isPickupDropOrder: !!pickupDropDetails,
-        orderType: pickupDropDetails
-          ? 'pickup_drop'
-          : 'regular',
-
-        // User
-        userId: user.uid,
-        userEmail: user.email ?? '',
-        userName: user.displayName ?? '',
-        userMobile: mobile.trim(),
-
-        // Restaurants involved
-        restaurantIds,
-        prescriptionImageUrl: '',
-        restaurantId: restaurantIds[0] ?? '',
-        restaurantName,
-        restaurantLogo,
-        restaurantPhone,
-
-        // Items
-        items: orderItems,
-        pickupDrop: pickupDropDetails,
-        pickupDropPartnerId: pickupDropDetails?.assignedPartnerId ?? '',
-        pickupDropPartnerName: pickupDropDetails?.assignedPartnerName ?? '',
-        pickupDropPartnerEarning: pickupDropDetails?.partnerEarning ?? 0,
-
-        // Delivery
-        address: address.trim(),
-        locationId: selectedLoc?.id ?? '',
-        locationName: selectedLoc?.name ?? '',
-        deliveryArea: selectedLoc?.name ?? '',
-        deliveryCharge: orderDeliveryCharge,
-        deliveryPartnerId,
-        deliveryPartnerName,
-        deliveryPartnerEarning,
-
-        // Coupon
-        appliedCouponId:   finalCouponId,
-        appliedCouponCode: finalCouponCode,
-        couponCartDiscount: finalCouponCartDiscount,
-        couponDeliveryDiscount: finalCouponDeliveryDiscount,
-
-        // Totals
-        subtotal,
-        totalAmount: finalTotalAmount,
-
-        // Payment
-        paymentMethod: paymentMethod,
-
-        // Status
-        status: 'pending',
-
-        // Settlement flags
-        settled: false,
-        partnerSettled: false,
-
-        // Timestamps
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      // ── Telegram notifications ─────────────────────────────────────────────
-      const botToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
-      const escapeHtml = (text) => {
-        if (!text) return '';
-        return String(text)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
-      };
-
-      const itemLines = cart
-        .map((i) => `  • ${escapeHtml(i.name)} × ${i.qty}  ₹${(i.discountPrice ?? i.price) * i.qty}`)
-        .join('\n');
-
-      const sendTelegram = async (chatId, text) => {
-        console.log('Sending Telegram message to chatId:', chatId);
-        try {
-          const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
-          });
-          if (!res.ok) {
-            const errBody = await res.json();
-            console.error('Telegram API Error details:', errBody);
-            throw new Error(errBody.description || 'Unknown Telegram Error');
-          }
-          console.log('Telegram message sent successfully');
-        } catch (err) {
-          console.error('Failed to send Telegram:', err);
-          throw err;
-        }
-      };
-
-      // 1️⃣  Restaurants
-      if (botToken && restaurantIds.length > 0) {
-        const byRestaurant = cart.reduce((acc, item) => {
-          const rId = item.restaurantId;
-          if (!rId) return acc;
-          if (!acc[rId]) acc[rId] = [];
-          acc[rId].push(item);
-          return acc;
-        }, {});
-
-        await Promise.all(
-          Object.entries(byRestaurant).map(async ([rId, items]) => {
-            try {
-              const restSnap = await getDoc(doc(db, 'restaurants', rId));
-              if (!restSnap.exists()) return;
-              const restChatId = restSnap.data().telegramChatId;
-              if (!restChatId) return;
-
-              const restItemLines = items
-                .map((i) => `  • ${escapeHtml(i.name)} × ${i.qty}  ₹${(i.discountPrice ?? i.price) * i.qty}`)
-                .join('\n');
-              const restSubtotal = items.reduce(
-                (sum, i) => sum + (i.discountPrice ?? i.price) * i.qty, 0
-              );
-
-              const restaurantMsg =
-                `🛒 <b>New Order Received!</b>\n` +
-                `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
-                `<b>Items:</b>\n${restItemLines}\n\n` +
-                `Subtotal: ₹${restSubtotal}\n\n` +
-                `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}`;
-
-              await sendTelegram(restChatId, restaurantMsg);
-            } catch (tgErr) {
-              console.warn(`Restaurant ${rId} Telegram notification skipped:`, tgErr);
-            }
-          })
-        );
-      }
-
-      // 2️⃣  Pickup & Drop partner — assigned from pickup location
-      if (pickupDropDetails && pickupDropDetails.assignedPartnerId && botToken) {
-        try {
-          const pdPartnerSnap = await getDoc(doc(db, 'deliveryPartners', pickupDropDetails.assignedPartnerId));
-          if (pdPartnerSnap.exists()) {
-            const pdPartnerData = pdPartnerSnap.data();
-            const isPdPartnerOnline = pdPartnerData.isOnline !== false;
-
-            if (isPdPartnerOnline) {
-              const pdChatId = pdPartnerData.telegramChatId;
-              if (pdChatId) {
-                const pickupDropMsg =
-                  `🛵 <b>New Pickup & Drop Assignment!</b>\n` +
-                  `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
-                  `📍 From: ${escapeHtml(pickupDropDetails.pickupLocationName)}\n` +
-                  `📍 To: ${escapeHtml(pickupDropDetails.dropLocationName)}\n\n` +
-                  `<b>Total Charge: ₹${pickupDropDetails.totalCharge}</b>\n` +
-                  `<b>Your Commission: ₹${pickupDropDetails.partnerEarning}</b>\n\n` +
-                  `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
-                  `Address details: ${escapeHtml(address.trim())}\n` +
-                  `${pickupDropDetails.note ? `Note: ${escapeHtml(pickupDropDetails.note)}\n` : ''}` +
-                  `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
-                  `Mobile: ${escapeHtml(mobile.trim())}`;
-
-                await sendTelegram(pdChatId, pickupDropMsg);
-              }
-            } else {
-              // Partner is offline — alert admin
-              const configSnap = await getDoc(doc(db, 'config', 'telegram'));
-              const adminChatId = configSnap.exists() ? configSnap.data().adminChatId : null;
-
-              if (adminChatId) {
-                let onlinePartnersList = 'None';
-                try {
-                  const partnersSnap = await getDocs(
-                    query(collection(db, 'deliveryPartners'), where('isOnline', '==', true))
-                  );
-                  const onlinePartners = partnersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-                  if (onlinePartners.length > 0) {
-                    onlinePartnersList = onlinePartners
-                      .map((p) => `  • ${escapeHtml(p.name)} (${escapeHtml(p.mobile || p.phone || 'No Mobile')})`)
-                      .join('\n');
-                  }
-                } catch (err) {
-                  console.warn('Failed to fetch online partners:', err);
-                }
-
-                const adminMsg =
-                  `⚠️ <b>Pickup & Drop Partner Offline Alert!</b>\n\n` +
-                  `The assigned rider for this Pickup & Drop order is currently <b>offline</b>.\n\n` +
-                  `<b>Order Details:</b>\n` +
-                  `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n` +
-                  `From: <b>${escapeHtml(pickupDropDetails.pickupLocationName)}</b>\n` +
-                  `To: <b>${escapeHtml(pickupDropDetails.dropLocationName)}</b>\n` +
-                  `Total Charge: ₹${pickupDropDetails.totalCharge}\n` +
-                  `${pickupDropDetails.note ? `Note: ${escapeHtml(pickupDropDetails.note)}\n` : ''}` +
-                  `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
-                  `Mobile: ${escapeHtml(mobile.trim())}\n` +
-                  `Address: ${escapeHtml(address.trim())}\n\n` +
-                  `<b>Assigned Partner (Offline):</b>\n` +
-                  `Name: ${escapeHtml(pdPartnerData.name || 'Unknown')}\n` +
-                  `Mobile: ${escapeHtml(pdPartnerData.mobile || pdPartnerData.phone || 'N/A')}\n\n` +
-                  `<b>Online Delivery Partners:</b>\n${onlinePartnersList}`;
-
-                await sendTelegram(adminChatId, adminMsg);
-              }
-            }
-          }
-        } catch (tgErr) {
-          console.warn('Pickup & Drop Telegram notification skipped:', tgErr);
-        }
-      }
-
-
-      // 3️⃣  Delivery partner
-      const checkPartnerId = pickupDropOnly
-        ? pickupDropDetails?.assignedPartnerId
-        : selectedDeliveryPartnerId;
-
-      if (cart.length > 0 && checkPartnerId && botToken) {
-        try {
-          const partnerSnap = await getDoc(doc(db, 'deliveryPartners', checkPartnerId));
-          if (partnerSnap.exists()) {
-            const partnerData = partnerSnap.data();
-            const isPartnerOnline = partnerData.isOnline !== false;
-
-            if (isPartnerOnline) {
-              const partnerChatId = partnerData.telegramChatId;
-              if (partnerChatId) {
-                const partnerMsg =
-                  `🛵 <b>New Delivery Assignment!</b>\n` +
-                  `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n\n` +
-                  `<b>Items:</b>\n${itemLines}\n\n` +
-                  `Subtotal: ₹${totalPrice}\n` +
-                  `Delivery: ₹${deliveryCharge}\n` +
-                  `<b>Total: ₹${totalPrice + deliveryCharge}</b>\n\n` +
-                  `Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}\n` +
-                  `Address: ${escapeHtml(address.trim())}\n` +
-                  `Customer: ${escapeHtml(user.displayName ?? user.email)}\n` +
-                  `Mobile: ${escapeHtml(mobile.trim())}`;
-
-                await sendTelegram(partnerChatId, partnerMsg);
-              }
-            } else {
-              // Partner is offline! Send msg to Admin
-              const configSnap = await getDoc(doc(db, 'config', 'telegram'));
-              const adminChatId = configSnap.exists() ? configSnap.data().adminChatId : null;
-
-              if (adminChatId) {
-                // Fetch all online partners
-                let onlinePartnersList = 'None';
-                try {
-                  const partnersSnap = await getDocs(
-                    query(collection(db, 'deliveryPartners'), where('isOnline', '==', true))
-                  );
-                  const onlinePartners = partnersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-                  if (onlinePartners.length > 0) {
-                    onlinePartnersList = onlinePartners
-                      .map(p => `  • ${escapeHtml(p.name)} (${escapeHtml(p.mobile || p.phone || 'No Mobile')})`)
-                      .join('\n');
-                  }
-                } catch (err) {
-                  console.warn('Failed to fetch online partners:', err);
-                }
-
-                const adminMsg =
-                  `⚠️ <b>Delivery Partner Offline Alert!</b>\n\n` +
-                  `The assigned partner for this order's location is currently <b>offline</b>.\n\n` +
-                  `<b>Order Details:</b>\n` +
-                  `Order ID: <code>${escapeHtml(orderRef.id)}</code>\n` +
-                  `Location: <b>${escapeHtml(selectedLoc?.name || '')}</b>\n` +
-                  `Total: ₹${totalPrice + deliveryCharge}\n` +
-                  `<b>Items:</b>\n${itemLines}\n\n` +
-                  `<b>Assigned Partner Details (Offline):</b>\n` +
-                  `Name: ${escapeHtml(partnerData.name || 'Unknown')}\n` +
-                  `Mobile: ${escapeHtml(partnerData.mobile || partnerData.phone || 'N/A')}\n\n` +
-                  `<b>Online Delivery Partners:</b>\n${onlinePartnersList}`;
-
-                await sendTelegram(adminChatId, adminMsg);
-              }
-            }
-          }
-        } catch (tgErr) {
-          console.warn('Partner/Admin Telegram notification skipped:', tgErr);
-        }
-      }
-
-      // ── Increment coupon usage AFTER order is saved ──────────────────────
-      if (finalCouponId) {
-        try {
-          await incrementCouponUsage(finalCouponId);
-        } catch (couponErr) {
-          console.warn('Coupon usage increment failed (non-critical):', couponErr);
-        }
-      }
-
-      clearCart();
-      toast.success('Order placed successfully! 🎉');
-      navigate('/order', { replace: true });
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to place order. Try again.');
-    } finally {
-      setPlacing(false);
-    }
-  };
+  const { cart, totalPrice, pickupOrderData, isOnline } = useCart();
+
+  const {
+    // Form state
+    address, setAddress,
+    mobile, setMobile,
+    paymentMethod, setPaymentMethod,
+
+    // Delivery locations
+    locations, selectedLoc, setSelectedLoc, locLoading,
+
+    // Coupon
+    couponCode, setCouponCode,
+    couponResult,
+    couponError, setCouponError,
+    couponLoading,
+    handleApplyCoupon,
+    handleRemoveCoupon,
+
+    // Derived
+    isPickupDropOrder,
+    needsDeliveryArea,
+    pickupDropCharge,
+    deliveryCharge,
+    couponCartDiscount,
+    couponDeliveryDiscount,
+    totalAmount,
+    belowMin,
+    canOrder,
+
+    // Actions
+    placing,
+    handlePlaceOrder,
+  } = useCheckout();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 pb-28 md:pb-10">
@@ -767,6 +191,7 @@ export default function Checkout() {
             {cart.map((item) => (
               <SummaryItem key={item.id} item={item} />
             ))}
+
             {isPickupDropOrder && (
               <div className="rounded-2xl border border-purple-100 bg-purple-50 px-4 py-3 space-y-2">
                 <div className="flex items-center gap-2">
@@ -886,9 +311,11 @@ export default function Checkout() {
           <textarea
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder={isPickupDropOrder
-              ? 'Enter pickup and drop address details — building, landmark, contact person…'
-              : 'Enter your full delivery address — flat/house no., street, landmark…'}
+            placeholder={
+              isPickupDropOrder
+                ? 'Enter pickup and drop address details — building, landmark, contact person…'
+                : 'Enter your full delivery address — flat/house no., street, landmark…'
+            }
             rows={3}
             className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white transition-all resize-none"
           />
@@ -920,9 +347,7 @@ export default function Checkout() {
                     onClick={handleApplyCoupon}
                     className="px-5 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm transition-all cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
                   >
-                    {couponLoading
-                      ? <Loader2 size={15} className="animate-spin" />
-                      : 'Apply'}
+                    {couponLoading ? <Loader2 size={15} className="animate-spin" /> : 'Apply'}
                   </button>
                 </div>
                 {couponError && (
@@ -1069,7 +494,7 @@ export default function Checkout() {
                     Coming Soon
                   </span>
                 </div>
-                <p className="text-slate-400 text-xs font-semibold mt-0.5">GPay, PhonePe, Paytm & more</p>
+                <p className="text-slate-400 text-xs font-semibold mt-0.5">GPay, PhonePe, Paytm &amp; more</p>
               </div>
               <div className="w-5 h-5 rounded-full border-2 border-slate-200 shrink-0" />
             </div>
@@ -1113,7 +538,9 @@ export default function Checkout() {
         )}
         {(!needsDeliveryArea || selectedLoc) && mobile.trim().length >= 10 && !address.trim() && (
           <p className="text-center text-xs text-slate-400 font-semibold -mt-2">
-            {isPickupDropOrder ? 'Enter pickup/drop address details to continue' : 'Enter your delivery address to continue'}
+            {isPickupDropOrder
+              ? 'Enter pickup/drop address details to continue'
+              : 'Enter your delivery address to continue'}
           </p>
         )}
       </div>

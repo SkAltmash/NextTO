@@ -151,14 +151,14 @@ export default function Navbar() {
 
         {/* Right: search + cart */}
         <div className="flex items-center gap-2">
-          {/* Search button */}
+          {/* Search button — mobile */}
           <motion.button
-            whileTap={{ scale: 0.88 }}
+            whileTap={{ scale: 0.92 }}
             onClick={() => setSearchOpen(true)}
             aria-label="Search"
-            className="flex items-center gap-1.5 bg-slate-100 border border-slate-200/50 rounded-xl px-3 py-1.5 cursor-pointer"
+            className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2 cursor-pointer shadow-sm"
           >
-            <SearchIcon size={15} className="text-slate-500" />
+            <SearchIcon size={14} className="text-orange-400 shrink-0" />
             <span className="text-xs text-slate-400 font-semibold">Search…</span>
           </motion.button>
 
@@ -253,15 +253,17 @@ export default function Navbar() {
         {/* Right actions */}
         <div className="flex items-center gap-2.5 shrink-0">
 
-          {/* Search bar */}
+          {/* Search bar — desktop */}
           <button
             onClick={() => setSearchOpen(true)}
             aria-label="Open search (Ctrl+K)"
-            className="hidden lg:flex items-center gap-2 bg-slate-100 hover:bg-slate-200/70 border border-slate-200/50 rounded-xl px-4 py-2 w-[190px] cursor-pointer transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+            className="hidden lg:flex items-center gap-2.5 bg-white border border-slate-200 hover:border-orange-300 rounded-2xl px-4 py-2.5 w-[220px] cursor-pointer transition-all duration-200 group shadow-sm hover:shadow-md hover:shadow-orange-100/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
           >
-            <SearchIcon size={14} className="text-slate-400 group-hover:text-orange-500 transition-colors shrink-0" />
-            <span className="text-xs text-slate-400 font-semibold select-none flex-1 text-left">Search…</span>
-            <kbd className="text-[10px] font-bold text-slate-300 bg-white border border-slate-200 rounded px-1.5 py-0.5 shrink-0">⌘K</kbd>
+            <div className="w-6 h-6 rounded-lg bg-orange-50 flex items-center justify-center shrink-0 group-hover:bg-orange-100 transition-colors">
+              <SearchIcon size={13} className="text-orange-400" />
+            </div>
+            <span className="text-xs text-slate-400 font-semibold select-none flex-1 text-left">Search anything…</span>
+            <kbd className="text-[10px] font-bold text-slate-300 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-0.5 shrink-0">⌘K</kbd>
           </button>
 
           {/* Cart */}
@@ -347,8 +349,10 @@ export default function Navbar() {
               className="fixed top-4 left-1/2 -translate-x-1/2 z-[61] w-[92vw] max-w-xl"
             >
               {/* Input row */}
-              <div className="flex items-center gap-3 bg-white rounded-2xl shadow-2xl shadow-black/20 px-4 py-3 border border-slate-200/60">
-                <SearchIcon size={18} className="text-orange-500 shrink-0" />
+              <div className="flex items-center gap-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/25 px-4 py-3.5 border border-slate-200/60">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shrink-0 shadow-md shadow-orange-400/30">
+                  <SearchIcon size={16} className="text-white" />
+                </div>
                 <input
                   ref={searchRef}
                   type="text"
@@ -357,14 +361,16 @@ export default function Navbar() {
                   placeholder="Search food, categories, restaurants…"
                   className="flex-1 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none bg-transparent"
                 />
-                {searchQuery && (
+                {searchQuery ? (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                    className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
                   >
-                    <X size={16} />
+                    <X size={14} />
                   </button>
+                ) : (
+                  <kbd className="text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200 rounded-lg px-1.5 py-1 shrink-0">Esc</kbd>
                 )}
               </div>
 
@@ -443,7 +449,8 @@ export default function Navbar() {
                             className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 transition-colors cursor-pointer text-left"
                           >
                             {p.images?.[0] ? (
-                              <img src={p.images[0]} alt={p.name} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                              <img src={p.images[0]} alt={p.name}
+                                className={`w-10 h-10 rounded-xl object-cover shrink-0 ${p.isAvailable === false ? 'grayscale' : ''}`} />
                             ) : (
                               <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
                                 <Package size={16} className="text-orange-400" />
@@ -452,17 +459,25 @@ export default function Navbar() {
                             <div className="flex-1 min-w-0">
                               <p className="font-bold text-slate-800 text-sm truncate flex items-center gap-1.5 flex-wrap">
                                 <span>{p.name}</span>
-                                {p.serviceType && (
-                                  <span className={`inline-block border text-[9px] font-black px-1.5 py-0.5 rounded-md capitalize ${p.serviceType.toLowerCase() === 'food' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                {p.isAvailable === false && (
+                                  <span className="inline-block bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                                    Out of Stock
+                                  </span>
+                                )}
+                                {p.serviceType && p.isAvailable !== false && (
+                                  <span className={`inline-block border text-[9px] font-black px-1.5 py-0.5 rounded-md capitalize ${
+                                    p.serviceType.toLowerCase() === 'food' ? 'bg-orange-50 text-orange-600 border-orange-100' :
                                     p.serviceType.toLowerCase() === 'grocery' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                      p.serviceType.toLowerCase() === 'medicine' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                        'bg-purple-50 text-purple-600 border-purple-100'
-                                    }`}>
+                                    p.serviceType.toLowerCase() === 'medicine' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                    'bg-purple-50 text-purple-600 border-purple-100'
+                                  }`}>
                                     in {p.serviceType}
                                   </span>
                                 )}
                               </p>
-                              <p className="text-orange-500 font-black text-xs">₹{p.discountPrice ?? p.price}</p>
+                              <p className={`font-black text-xs ${p.isAvailable === false ? 'text-slate-400' : 'text-orange-500'}`}>
+                                ₹{p.discountPrice ?? p.price}
+                              </p>
                             </div>
                           </button>
                         ))}

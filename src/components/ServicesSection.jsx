@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UtensilsCrossed, ShoppingBasket, Pill, Bike,
-  Plus, Minus, CheckCircle2, ArrowRight, Loader2, Package, Clock, Heart, PauseCircle
+  ArrowRight, Loader2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where, limit, or } from 'firebase/firestore';
 import { db } from '../firebase';
-import { useCart } from '../context/CartContext';
+import ProductCard from '../components/ProductCard';
 
 /* ─── service tab config ─── */
 const TABS = [
@@ -52,145 +52,6 @@ const TABS = [
     emptyIcon: 'text-purple-300',
   },
 ];
-
-/* ─── mini product card ─── */
-function MiniProductCard({ product }) {
-  const { addToCart, cart, updateQty, pickupOrderData, toggleFavorite, isFavorite, isOnline } = useCart();
-  const navigate = useNavigate();
-  const [added, setAdded] = useState(false);
-
-  const cartItem = cart.find((i) => i.id === product.id);
-  const discount = product.price && product.discountPrice
-    ? Math.round(((product.price - product.discountPrice) / product.price) * 100)
-    : null;
-
-  const handleAdd = (e) => {
-    e.stopPropagation();
-    addToCart(product);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1400);
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -3 }}
-      transition={{ duration: 0.25 }}
-      className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:shadow-orange-100/40 overflow-hidden cursor-pointer group relative"
-      onClick={() => navigate(`/product/${product.id}`)}
-    >
-      {/* Image */}
-      <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
-        {product.images?.[0] ? (
-          <img
-            src={product.images[0]}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <UtensilsCrossed size={28} className="text-slate-300" />
-          </div>
-        )}
-        {discount && (
-          <div className="absolute top-2 left-2 bg-orange-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
-            {discount}% OFF
-          </div>
-        )}
-
-        {/* Favorite Heart Button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleFavorite(product);
-          }}
-          className="absolute top-2 right-2 w-6 h-6 rounded-lg bg-white/90 hover:bg-white border border-slate-100/60 flex items-center justify-center shadow-md cursor-pointer transition-all hover:scale-110 z-10"
-        >
-          <Heart
-            size={11}
-            className={`transition-all ${isFavorite(product.id) ? 'fill-red-500 text-red-500 scale-110' : 'text-slate-400 hover:text-red-500'
-              }`}
-          />
-        </button>
-
-        {!product.isAvailable && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <span className="bg-white/90 text-slate-700 text-xs font-bold px-3 py-1 rounded-full">Unavailable</span>
-          </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="p-3">
-        <h3 className="font-black text-slate-900 text-sm leading-tight line-clamp-1">{product.name}</h3>
-        <p className="text-slate-400 text-xs mt-0.5 line-clamp-1 font-medium">{product.description}</p>
-
-        {product.preparationTime && (
-          <div className="flex items-center gap-1 mt-1.5 text-[11px] text-slate-400 font-semibold">
-            <Clock size={10} /> {product.preparationTime}
-          </div>
-        )}
-
-        <div className="flex items-center justify-between mt-2.5">
-          <div>
-            <span className="text-orange-500 font-black text-sm">₹{product.discountPrice ?? product.price}</span>
-            {product.discountPrice && product.price && (
-              <span className="text-slate-400 text-[11px] font-semibold line-through ml-1">₹{product.price}</span>
-            )}
-          </div>
-
-          {product.isAvailable !== false && (
-            !isOnline ? (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="p-1.5 rounded-xl bg-slate-100 text-slate-300 cursor-not-allowed"
-                title="Store paused"
-              >
-                <PauseCircle size={13} />
-              </div>
-            ) : pickupOrderData ? (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="p-1.5 rounded-xl bg-slate-100 text-slate-400 cursor-not-allowed"
-                title="Remove Pickup & Drop first"
-              >
-                <Bike size={13} />
-              </div>
-            ) : cartItem ? (
-              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={(e) => { e.stopPropagation(); updateQty(product.id, cartItem.qty - 1); }}
-                  className="w-6 h-6 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all cursor-pointer"
-                >
-                  <Minus size={9} />
-                </button>
-                <span className="font-black text-slate-800 text-xs w-4 text-center">{cartItem.qty}</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); updateQty(product.id, cartItem.qty + 1); }}
-                  className="w-6 h-6 rounded-lg bg-orange-500 flex items-center justify-center text-white hover:bg-orange-600 transition-all cursor-pointer"
-                >
-                  <Plus size={9} />
-                </button>
-              </div>
-            ) : (
-              <motion.button
-                whileHover={{ scale: 1.12 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleAdd}
-                className={`p-1.5 rounded-xl shadow transition-colors cursor-pointer text-white text-xs ${added ? 'bg-emerald-500' : 'bg-orange-500 hover:bg-orange-600'
-                  }`}
-              >
-                {added ? <CheckCircle2 size={13} /> : <Plus size={13} />}
-              </motion.button>
-            )
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 /* ─── pickup & drop promo card ─── */
 function PickupPromo() {
@@ -334,7 +195,7 @@ export default function ServicesSection() {
                     <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:-mx-6 sm:px-6">
                       {filtered.map((p) => (
                         <div key={p.id} className="shrink-0 w-44 sm:w-48">
-                          <MiniProductCard product={p} />
+                          <ProductCard product={p} />
                         </div>
                       ))}
                     </div>
