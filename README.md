@@ -22,7 +22,7 @@ Architected with visual excellence, premium animations, and secure cloud workflo
 ### 3. 🎯 Deep Linking & Advanced Search
 * **Tab Parameter Syncing**: `/product?tab=grocery` deep links instantly activate the corresponding shop categories.
 * **Clean Global Search**: High-performance instant filtering matching product names and category IDs, completely excluding background description clutter.
-* **Custom WhatsApp Fallback**: If an item is out of stock or unlisted, customers are presented with an instant WhatsApp Order button redirecting the exact query directly to `8799884148`.
+* **Custom WhatsApp Fallback**: If an item is out of stock or unlisted, customers are presented with an instant WhatsApp Order button redirecting the exact query directly to `7972081926`.
 
 ### 4. ❤️ Favorites Engine
 * One-click absolute floating Heart additions across all views (Products list, Search list, related sliders, and detail pages).

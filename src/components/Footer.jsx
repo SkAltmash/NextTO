@@ -4,7 +4,7 @@ import { ShoppingBag, Phone, MapPin, Mail, ChevronRight, Heart, ExternalLink } f
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
-  const whatsappNumber = '8799884148';
+  const whatsappNumber = '7972081926';
   const whatsappUrl = `https://wa.me/91${whatsappNumber}`;
 
   return (

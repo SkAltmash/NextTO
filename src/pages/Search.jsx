@@ -329,7 +329,7 @@ export default function Search() {
             </div>
             
             <a
-              href={`https://wa.me/918799884148?text=${encodeURIComponent(`Hello Food Express! I searched for "${query}" on your website but couldn't find it. Can I order this here?`)}`}
+              href={`https://wa.me/917972081926?text=${encodeURIComponent(`Hello Food Express! I searched for "${query}" on your website but couldn't find it. Can I order this here?`)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full inline-flex items-center justify-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-xs sm:text-sm cursor-pointer"

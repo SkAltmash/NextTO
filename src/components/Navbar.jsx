@@ -81,9 +81,9 @@ export default function Navbar() {
         getDocs(collection(db, 'categories')),
       ]).then(([pSnap, rSnap, cSnap]) => {
         setAllData({
-          products:    pSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+          products: pSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
           restaurants: rSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-          categories:  cSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+          categories: cSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
         });
         setDataLoaded(true);
       }).catch(console.error);
@@ -95,9 +95,9 @@ export default function Navbar() {
   const q = searchQuery.trim().toLowerCase();
   const resultCategories = q
     ? allData.categories.filter((c) =>
-        c.name?.toLowerCase().includes(q) ||
-        c.serviceType?.toLowerCase().includes(q)
-      ).slice(0, 4)
+      c.name?.toLowerCase().includes(q) ||
+      c.serviceType?.toLowerCase().includes(q)
+    ).slice(0, 4)
     : [];
   const resultProducts = q
     ? allData.products.filter((p) =>
@@ -393,7 +393,7 @@ export default function Navbar() {
                           </p>
                         </div>
                         <a
-                          href={`https://wa.me/918799884148?text=${encodeURIComponent(`Hello Food Express! I searched for "${searchQuery}" on your website but couldn't find it. Can I order this here?`)}`}
+                          href={`https://wa.me/917972081926?text=${encodeURIComponent(`Hello NextTo! I searched for "${searchQuery}" on your website but couldn't find it. Can I order this here?`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-2.5 px-4 rounded-xl text-xs shadow-md shadow-emerald-500/10 transition-colors cursor-pointer"
@@ -409,9 +409,9 @@ export default function Navbar() {
                         <p className="px-4 pt-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">Categories</p>
                         {resultCategories.map((cat) => {
                           const CAT_GRADIENT = {
-                            food:     'from-orange-400 to-amber-500',
+                            food: 'from-orange-400 to-amber-500',
                             medicine: 'from-blue-400 to-cyan-500',
-                            grocery:  'from-emerald-400 to-teal-500',
+                            grocery: 'from-emerald-400 to-teal-500',
                           };
                           return (
                             <button
@@ -465,12 +465,11 @@ export default function Navbar() {
                                   </span>
                                 )}
                                 {p.serviceType && p.isAvailable !== false && (
-                                  <span className={`inline-block border text-[9px] font-black px-1.5 py-0.5 rounded-md capitalize ${
-                                    p.serviceType.toLowerCase() === 'food' ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                                    p.serviceType.toLowerCase() === 'grocery' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                    p.serviceType.toLowerCase() === 'medicine' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                    'bg-purple-50 text-purple-600 border-purple-100'
-                                  }`}>
+                                  <span className={`inline-block border text-[9px] font-black px-1.5 py-0.5 rounded-md capitalize ${p.serviceType.toLowerCase() === 'food' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                      p.serviceType.toLowerCase() === 'grocery' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                        p.serviceType.toLowerCase() === 'medicine' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                          'bg-purple-50 text-purple-600 border-purple-100'
+                                    }`}>
                                     in {p.serviceType}
                                   </span>
                                 )}

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { MessageSquare, ArrowRight, Sparkles, HelpCircle } from 'lucide-react';
 
 export default function WhatsAppCTA() {
-  const phoneNumber = '8799884148';
+  const phoneNumber = '7972081926';
   const message = encodeURIComponent("Hello NextTo! I need to order something that is not listed on the website.");
   const whatsappUrl = `https://wa.me/91${phoneNumber}?text=${message}`;
 
