@@ -89,7 +89,12 @@ export default async function handler(req, res) {
 
       if (!response.ok) {
         const errText = await response.text();
-        results.push({ restaurantId: rId, success: false, error: errText });
+        results.push({ 
+          restaurantId: rId, 
+          success: false, 
+          error: errText,
+          debugAuthHeader: authHeader ? `${authHeader.substring(0, 15)}...` : 'EMPTY'
+        });
       } else {
         results.push({ restaurantId: rId, success: true });
       }
