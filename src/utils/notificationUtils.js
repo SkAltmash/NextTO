@@ -88,18 +88,10 @@ async function getAdminChatId() {
 // ─── Notification Functions ───────────────────────────────────────────────────
 
 /**
- * Sends per-restaurant order notifications via Telegram.
- *
- * @param {{
- *   botToken: string,
- *   orderId: string,
- *   cart: Array,
- *   paymentMethod: string,
- * }} params
+ * Direct client-side fallback to trigger OneSignal notification.
+ * This is used when the serverless API endpoint is unavailable (e.g. running vite local dev server).
  */
-export async function notifyRestaurants({ botToken, orderId, cart, paymentMethod }) {
-  if (!botToken || !cart.length) return;
-
+async function notifyRestaurantsDirect({ orderId, cart }) {
   // Group cart items by restaurantId
   const byRestaurant = cart.reduce((acc, item) => {
     if (!item.restaurantId) return acc;
@@ -107,33 +99,95 @@ export async function notifyRestaurants({ botToken, orderId, cart, paymentMethod
     return acc;
   }, {});
 
+  // Fetch OneSignal config dynamically from Firestore config/onesignal
+  let appId = '3867fc82-fa3e-4a1a-b476-04a1d747d81b';
+  let restApiKey = '';
+  try {
+    const snap = await getDoc(doc(db, 'config', 'onesignal'));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.appId) appId = data.appId;
+      restApiKey = data.restApiKey || '';
+    }
+  } catch (err) {
+    console.warn('[notify] Failed to fetch OneSignal configuration:', err.message);
+  }
+
+  if (!restApiKey) {
+    console.warn('[notify] OneSignal restApiKey not set — skipping restaurant push fallback.');
+    return;
+  }
+
   await Promise.allSettled(
     Object.entries(byRestaurant).map(async ([rId, items]) => {
       try {
-        const snap = await getDoc(doc(db, 'restaurants', rId));
-        if (!snap.exists()) return;
-        const chatId = snap.data().telegramChatId;
-        if (!chatId) return;
-
         const itemLines = items
-          .map((i) => `  • ${escapeHtml(i.name)} × ${i.qty}  ₹${(i.discountPrice ?? i.price) * i.qty}`)
-          .join('\n');
-        const subtotal = items.reduce((s, i) => s + (i.discountPrice ?? i.price) * i.qty, 0);
-        const payLabel = paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase();
+          .map((i) => `• ${i.name} × ${i.qty}`)
+          .join(', ');
 
-        const msg =
-          `🛒 <b>New Order Received!</b>\n` +
-          `Order ID: <code>${escapeHtml(orderId)}</code>\n\n` +
-          `<b>Items:</b>\n${itemLines}\n\n` +
-          `Subtotal: ₹${subtotal}\n\n` +
-          `Payment: ${payLabel}`;
+        const response = await fetch('https://onesignal.com/api/v1/notifications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': `Basic ${restApiKey}`,
+          },
+          body: JSON.stringify({
+            app_id: appId,
+            headings: { en: 'New Order Received!' },
+            contents: { en: `Order ID: ${orderId}\nItems: ${itemLines}` },
+            filters: [
+              { field: 'tag', key: 'restaurantId', relation: '=', value: rId }
+            ],
+            data: { screen: 'orders' }
+          }),
+          keepalive: true,
+        });
 
-        await sendTelegramMessage(botToken, chatId, msg);
+        if (!response.ok) {
+          const errText = await response.text();
+          console.warn(`[notify] OneSignal error for restaurant ${rId}:`, errText);
+        } else {
+          console.log(`[notify] OneSignal notification sent successfully to restaurant ${rId}`);
+        }
       } catch (err) {
-        console.warn(`[notify] Restaurant ${rId} Telegram skipped:`, err.message);
+        console.warn(`[notify] Restaurant ${rId} OneSignal notification skipped:`, err.message);
       }
     })
   );
+}
+
+/**
+ * Sends per-restaurant order push notifications via serverless function (bypasses adblockers).
+ * Falls back to client-side trigger if the serverless API route is unavailable.
+ *
+ * @param {{
+ *   orderId: string,
+ *   cart: Array,
+ * }} params
+ */
+export async function notifyRestaurants({ orderId, cart }) {
+  if (!cart.length) return;
+
+  try {
+    const response = await fetch('/api/notify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ orderId, cart }),
+      keepalive: true,
+    });
+
+    if (response.status === 404 || !response.ok) {
+      console.warn(`[notify] API notification returned status ${response.status}. Falling back to direct client-side call...`);
+      await notifyRestaurantsDirect({ orderId, cart });
+    } else {
+      console.log('[notify] OneSignal push triggered successfully via serverless API route.');
+    }
+  } catch (err) {
+    console.warn('[notify] API notification route failed, falling back to direct client-side call:', err.message);
+    await notifyRestaurantsDirect({ orderId, cart }).catch(() => {});
+  }
 }
 
 /**
@@ -331,12 +385,6 @@ export async function notifyPickupDropPartner({
  * }} params
  */
 export function dispatchOrderNotifications(params) {
-  const botToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
-  if (!botToken) {
-    console.warn('[notify] VITE_TELEGRAM_BOT_TOKEN not set — skipping all notifications.');
-    return;
-  }
-
   const {
     orderId,
     cart,
@@ -352,9 +400,15 @@ export function dispatchOrderNotifications(params) {
     mobile,
   } = params;
 
-  // 1️⃣  Restaurant notifications (regular cart items only)
-  if (cart.length > 0) {
-    notifyRestaurants({ botToken, orderId, cart, paymentMethod }).catch(() => { });
+  // 1️⃣ OneSignal Push notifications for restaurants (replacing Telegram restaurant notifications)
+  if (cart && cart.length > 0) {
+    notifyRestaurants({ orderId, cart }).catch(() => { });
+  }
+
+  const botToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    console.warn('[notify] VITE_TELEGRAM_BOT_TOKEN not set — skipping Telegram notifications.');
+    return;
   }
 
   // 2️⃣  Pickup & Drop partner
