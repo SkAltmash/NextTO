@@ -182,7 +182,8 @@ export async function notifyRestaurants({ orderId, cart }) {
       console.warn(`[notify] API notification returned status ${response.status}. Falling back to direct client-side call...`);
       await notifyRestaurantsDirect({ orderId, cart });
     } else {
-      console.log('[notify] OneSignal push triggered successfully via serverless API route.');
+      const data = await response.json().catch(() => ({}));
+      console.log('[notify] OneSignal push triggered successfully via serverless API route. Results:', data.results);
     }
   } catch (err) {
     console.warn('[notify] API notification route failed, falling back to direct client-side call:', err.message);
