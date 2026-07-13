@@ -70,7 +70,7 @@ export default async function handler(req, res) {
       const itemLines = items.map((i) => `• ${i.name} × ${i.qty}`).join(', ');
 
       const authHeader = restApiKey.startsWith('os_v2_') ? `Key ${restApiKey}` : `Basic ${restApiKey}`;
-      const response = await fetch('https://onesignal.com/api/v1/notifications', {
+      const response = await fetch('https://api.onesignal.com/notifications', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
