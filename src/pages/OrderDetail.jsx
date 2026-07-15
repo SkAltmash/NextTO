@@ -7,7 +7,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   ArrowLeft, ArrowRight, Clock, MapPin, Package, Loader2, AlertCircle,
   ClipboardList, CheckCircle2, ChefHat, Bike, XCircle,
-  Phone, CreditCard, Banknote, Store, Copy, Check, FileImage, Navigation, Tag
+  Phone, CreditCard, Banknote, Store, Copy, Check, FileImage, Navigation, Tag,
+  Cloud
 } from 'lucide-react';
 
 // ─── Status Config ─────────────────────────────────────────────────────────────
@@ -307,6 +308,12 @@ export default function OrderDetail() {
                 <span className={order?.couponDeliveryDiscount > 0 ? 'line-through text-slate-400' : 'text-orange-500'}>
                   ₹{order.deliveryCharge}
                 </span>
+              </div>
+            )}
+            {order?.rainSurcharge > 0 && (
+              <div className="flex justify-between text-xs font-semibold text-blue-500">
+                <span className="flex items-center gap-1"><Cloud size={11} className="shrink-0" /> Rain surcharge</span>
+                <span>+₹{order.rainSurcharge}</span>
               </div>
             )}
             {order?.couponCartDiscount > 0 && (

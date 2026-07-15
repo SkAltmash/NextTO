@@ -105,7 +105,7 @@ export default function Footer() {
             <ul className="space-y-4 text-xs sm:text-sm font-semibold text-slate-500">
               <li className="flex items-start gap-3">
                 <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5" />
-                <span>Express Delivery Areas, Gujarat, India</span>
+                <span>Express Delivery Areas, Hinganghat, Dist - Wardha,</span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone size={16} className="text-slate-400 shrink-0" />

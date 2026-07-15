@@ -69,6 +69,9 @@ export function useCheckout() {
   // ── Order placement ─────────────────────────────────────────────────────────
   const [placing, setPlacing] = useState(false);
 
+  // ── Rain surcharge ──────────────────────────────────────────────────────────
+  const [rainCharges, setRainCharges] = useState(null); // { isEnabled, surchargeFlat, customerMessage }
+
   // ── Coupon state ────────────────────────────────────────────────────────────
   const [couponCode, setCouponCode] = useState('');
   const [couponResult, setCouponResult] = useState(null); // { valid, coupon, cartDiscount, deliveryDiscount }
@@ -115,6 +118,24 @@ export function useCheckout() {
     return () => { cancelled = true; };
   }, []);
 
+  // ─── Fetch rain surcharge config ────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'config', 'rainCharges'));
+        if (!cancelled && snap.exists()) {
+          setRainCharges(snap.data());
+        }
+      } catch (err) {
+        console.warn('[useCheckout] fetchRainCharges:', err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
   // ─── Derived values ──────────────────────────────────────────────────────────
   const isPickupDropOrder = !!pickupOrderData;
   const needsDeliveryArea = cart.length > 0;
@@ -125,10 +146,15 @@ export function useCheckout() {
   const couponCartDiscount = couponResult?.cartDiscount ?? 0;
   const couponDeliveryDiscount = couponResult?.deliveryDiscount ?? 0;
 
+  // Rain surcharge (only when enabled)
+  const rainSurcharge = rainCharges?.isEnabled ? numberValue(rainCharges.surchargeFlat) : 0;
+  const rainMessage = rainCharges?.isEnabled ? (rainCharges.customerMessage ?? '') : '';
+
   const totalAmount =
     totalPrice +
     (needsDeliveryArea ? deliveryCharge : 0) +
-    pickupDropCharge -
+    pickupDropCharge +
+    rainSurcharge -
     couponCartDiscount -
     couponDeliveryDiscount;
 
@@ -281,7 +307,7 @@ export function useCheckout() {
         ? pickupDropDetails.partnerEarning
         : isPartnerOnline ? selectedDeliveryPartnerEarning : 0;
 
-      // ── Step 6: Fetch restaurant data (commission rates, phones) ─────────────
+      // ── Step 6: Fetch restaurant data (names, phones, logos) ────────────────
       const restaurantDataMap = {};
       if (restaurantIds.length > 0) {
         try {
@@ -295,7 +321,6 @@ export function useCheckout() {
                 name: d.name ?? '',
                 phone: d.phone ?? '',
                 logo: d.logo ?? '',
-                commissionRate: numberValue(d.commissionRate),
               };
             }
           });
@@ -305,7 +330,7 @@ export function useCheckout() {
       }
 
       const firstRestData = restaurantDataMap[restaurantIds[0]] ?? {
-        name: '', phone: '', logo: '', commissionRate: 0,
+        name: '', phone: '', logo: '',
       };
 
       // ── Step 7: Build order items array ──────────────────────────────────────
@@ -334,7 +359,7 @@ export function useCheckout() {
             restaurantName: rData?.name ?? '',
             restaurantLogo: rData?.logo ?? '',
             restaurantPhone: rData?.phone ?? '',
-            commissionRate: rData?.commissionRate ?? 0,
+            commissionRate: numberValue(i.commissionRate),  // from product, not restaurant
             deliveryArea: selectedLoc?.name ?? '',
           };
         }),
@@ -344,8 +369,9 @@ export function useCheckout() {
       // ── Step 8: Compute final totals ─────────────────────────────────────────
       const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
       const orderDeliveryCharge = needsDeliveryArea ? deliveryCharge : 0;
+      const finalRainSurcharge = rainCharges?.isEnabled ? numberValue(rainCharges.surchargeFlat) : 0;
       const finalTotalAmount =
-        subtotal + orderDeliveryCharge - finalCouponCartDiscount - finalCouponDeliveryDiscount;
+        subtotal + orderDeliveryCharge + finalRainSurcharge - finalCouponCartDiscount - finalCouponDeliveryDiscount;
 
       // ── Step 9: Save the order to Firestore ───────────────────────────────────
       const orderRef = await addDoc(collection(db, 'orders'), {
@@ -390,6 +416,10 @@ export function useCheckout() {
         appliedCouponCode: finalCouponCode,
         couponCartDiscount: finalCouponCartDiscount,
         couponDeliveryDiscount: finalCouponDeliveryDiscount,
+
+        // Rain surcharge
+        rainSurcharge: finalRainSurcharge,
+        rainMessage: rainCharges?.isEnabled ? (rainCharges.customerMessage ?? '') : '',
 
         // Totals
         subtotal,
@@ -474,6 +504,8 @@ export function useCheckout() {
     needsDeliveryArea,
     pickupDropCharge,
     deliveryCharge,
+    rainSurcharge,
+    rainMessage,
     couponCartDiscount,
     couponDeliveryDiscount,
     totalAmount,

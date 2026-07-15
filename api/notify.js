@@ -83,7 +83,11 @@ export default async function handler(req, res) {
           filters: [
             { field: 'tag', key: 'restaurantId', relation: '=', value: rId }
           ],
-          data: { screen: 'orders' }
+          data: { screen: 'orders' },
+          priority: 10,
+          android_channel_id: undefined,
+          small_icon: 'ic_stat_onesignal_default',
+          android_visibility: 1,
         }),
       });
 

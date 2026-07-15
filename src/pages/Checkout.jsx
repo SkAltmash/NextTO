@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin, ChevronDown, Loader2, CheckCircle2, AlertCircle,
   ShoppingBag, ArrowLeft, Package, Truck, Tag, Wallet, Banknote, Phone,
-  Bike, Navigation, PauseCircle,
+  Bike, Navigation, PauseCircle, CloudRain,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -125,6 +125,8 @@ export default function Checkout() {
     needsDeliveryArea,
     pickupDropCharge,
     deliveryCharge,
+    rainSurcharge,
+    rainMessage,
     couponCartDiscount,
     couponDeliveryDiscount,
     totalAmount,
@@ -171,6 +173,28 @@ export default function Checkout() {
                 <p className="font-black text-amber-800 text-sm">Store is temporarily paused</p>
                 <p className="text-amber-600 text-xs font-semibold mt-0.5 leading-relaxed">
                   We're not accepting new orders right now. Please check back soon!
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Rain Surcharge Banner ── */}
+        <AnimatePresence>
+          {rainSurcharge > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="flex items-start gap-3 bg-blue-50 border-2 border-blue-200 rounded-2xl px-4 py-4"
+            >
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                <CloudRain size={20} className="text-blue-500" />
+              </div>
+              <div>
+                <p className="font-black text-blue-800 text-sm">Rain Surcharge Applied</p>
+                <p className="text-blue-600 text-xs font-semibold mt-0.5 leading-relaxed">
+                  {rainMessage || 'Rainy weather surcharge applied'} — +₹{rainSurcharge}
                 </p>
               </div>
             </motion.div>
@@ -434,6 +458,14 @@ export default function Checkout() {
                   <Truck size={12} className="shrink-0" /> Delivery discount
                 </span>
                 <span>−₹{couponDeliveryDiscount}</span>
+              </div>
+            )}
+            {rainSurcharge > 0 && (
+              <div className="flex justify-between text-sm font-semibold text-blue-600">
+                <span className="flex items-center gap-1">
+                  <CloudRain size={12} className="shrink-0" /> Rain surcharge
+                </span>
+                <span>+₹{rainSurcharge}</span>
               </div>
             )}
             {(couponCartDiscount > 0 || couponDeliveryDiscount > 0) && (
