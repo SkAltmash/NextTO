@@ -253,11 +253,13 @@ export function useCheckout() {
       const selectedDeliveryPartnerId = selectedLoc?.assignedPartnerId ?? '';
       const selectedDeliveryPartnerName = selectedLoc?.assignedPartnerName ?? '';
       let selectedDeliveryPartnerEarning = 0;
+      let selectedDeliveryPartnerPhone = '';
       let isPartnerOnline = true;
 
       if (selectedDeliveryPartnerId) {
         const partner = await fetchPartner(selectedDeliveryPartnerId);
         selectedDeliveryPartnerEarning = numberValue(partner?.commissionFlat);
+        selectedDeliveryPartnerPhone = partner?.phone ?? '';
         isPartnerOnline = partner ? partner.isOnline !== false : true;
       }
 
@@ -306,6 +308,10 @@ export function useCheckout() {
       const deliveryPartnerEarning = pickupDropOnly
         ? pickupDropDetails.partnerEarning
         : isPartnerOnline ? selectedDeliveryPartnerEarning : 0;
+
+      const deliveryPartnerNumber = pickupDropOnly
+        ? ''
+        : isPartnerOnline ? selectedDeliveryPartnerPhone : '';
 
       // ── Step 6: Fetch restaurant data (names, phones, logos) ────────────────
       const restaurantDataMap = {};
@@ -370,6 +376,11 @@ export function useCheckout() {
       const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
       const orderDeliveryCharge = needsDeliveryArea ? deliveryCharge : 0;
       const finalRainSurcharge = rainCharges?.isEnabled ? numberValue(rainCharges.surchargeFlat) : 0;
+
+      // 50% of rain surcharge goes to delivery partner
+      const rainPartnerBonus = Math.round(finalRainSurcharge * 0.5);
+      const finalDeliveryPartnerEarning = deliveryPartnerEarning + rainPartnerBonus;
+
       const finalTotalAmount =
         subtotal + orderDeliveryCharge + finalRainSurcharge - finalCouponCartDiscount - finalCouponDeliveryDiscount;
 
@@ -409,7 +420,9 @@ export function useCheckout() {
         deliveryCharge: orderDeliveryCharge,
         deliveryPartnerId,
         deliveryPartnerName,
-        deliveryPartnerEarning,
+        deliveryPartnerNumber,
+        deliveryPartnerEarning: finalDeliveryPartnerEarning,
+        rainPartnerBonus,
 
         // Coupon
         appliedCouponId: finalCouponId,
