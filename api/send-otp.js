@@ -29,10 +29,30 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid phone number format' });
   }
 
+  // ── Demo / Play Store test accounts ──────────────────────────────────────────
+  // Add test phone numbers (last 10 digits) here for Play Store reviewers.
+  // These numbers bypass 2Factor and accept OTP "123456" automatically.
+  const DEMO_PHONE_NUMBERS = [
+    process.env.DEMO_PHONE_1, // e.g. 9000000001
+    process.env.DEMO_PHONE_2, // e.g. 9000000002
+  ].filter(Boolean); // ignore undefined env vars
+
+  const last10 = cleanPhone.slice(-10);
+  if (DEMO_PHONE_NUMBERS.includes(last10)) {
+    console.log(`[send-otp] Demo account detected: ${last10}`);
+    return res.status(200).json({
+      success: true,
+      sessionId: 'DEMO_SESSION',
+      isDemo: true,
+    });
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const apiKey = process.env.TWO_FACTOR_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: 'TWO_FACTOR_API_KEY is not configured on the server' });
   }
+
 
   try {
     // 2Factor AUTOGEN endpoint generates and sends a random 6-digit OTP

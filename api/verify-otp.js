@@ -49,17 +49,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Verify OTP with 2Factor API
-    const verifyUrl = `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY/${sessionId}/${otp}`;
-    const verifyResponse = await fetch(verifyUrl);
-    const verifyData = await verifyResponse.json();
+    // ── Demo / Play Store test accounts ──────────────────────────────────────
+    // If send-otp returned sessionId = "DEMO_SESSION", skip 2Factor and accept
+    // the static demo OTP "123456" so Play Store reviewers can test the app.
+    const DEMO_OTP = '123456';
+    const isDemo = sessionId === 'DEMO_SESSION';
 
-    if (verifyData.Status !== 'Success' || verifyData.Details !== 'OTP Matched') {
-      return res.status(400).json({
-        success: false,
-        error: verifyData.Details || 'Invalid OTP code',
-      });
+    if (isDemo) {
+      if (otp !== DEMO_OTP) {
+        return res.status(400).json({
+          success: false,
+          error: `Demo account: please use OTP ${DEMO_OTP}`,
+        });
+      }
+      console.log(`[verify-otp] Demo OTP accepted for ${cleanPhone}`);
+      // Fall through to Firebase user creation below
+    } else {
+      // 1. Verify OTP with 2Factor API
+      const verifyUrl = `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY/${sessionId}/${otp}`;
+      const verifyResponse = await fetch(verifyUrl);
+      const verifyData = await verifyResponse.json();
+
+      if (verifyData.Status !== 'Success' || verifyData.Details !== 'OTP Matched') {
+        return res.status(400).json({
+          success: false,
+          error: verifyData.Details || 'Invalid OTP code',
+        });
+      }
     }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // OTP is valid!
     // 2. Provision / retrieve Firebase user
