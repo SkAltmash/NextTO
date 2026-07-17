@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
   try {
     // 2Factor AUTOGEN endpoint generates and sends a random 6-digit OTP
-    const url = `https://2factor.in/API/V1/${apiKey}/SMS/${cleanPhone}/AUTOGEN/OTP_TEMPLATE_1`;
+    const url = `https://2factor.in/API/V1/${apiKey}/SMS/${cleanPhone}/AUTOGEN/OTP1`;
     const response = await fetch(url);
     const data = await response.json();
 
