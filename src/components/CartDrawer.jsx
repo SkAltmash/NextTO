@@ -5,11 +5,12 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
+import CompleteYourMeal from './CompleteYourMeal';
 
 export default function CartDrawer({ open, onClose }) {
   const {
     cart, updateQty, clearCart, totalItems, totalPrice,
-    pickupOrderData, setPickupOrderData, isOnline
+    pickupOrderData, setPickupOrderData, isOnline, cartRestaurantId
   } = useCart();
   const navigate = useNavigate();
 
@@ -187,10 +188,17 @@ export default function CartDrawer({ open, onClose }) {
                           >
                             <Plus size={12} />
                           </button>
-                        </div>
+                      </div>
                       </motion.div>
                     );
                   })}
+
+                  {/* Complete Your Meal section */}
+                  {cartRestaurantId && (
+                    <div className="pt-2 border-t border-slate-100 mt-4">
+                      <CompleteYourMeal restaurantId={cartRestaurantId} compact={true} />
+                    </div>
+                  )}
                 </AnimatePresence>
               )}
             </div>

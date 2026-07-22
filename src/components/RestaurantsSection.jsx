@@ -61,9 +61,9 @@ function RestaurantCard({ restaurant }) {
       className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:shadow-orange-100/30 overflow-hidden cursor-pointer group shrink-0 w-52 sm:w-56"
     >
       {/* Banner */}
-      <div className="relative h-28 bg-gradient-to-br from-orange-100 to-amber-50 overflow-hidden">
+      <div className="relative h-36 bg-gradient-to-br from-orange-100 to-amber-50 overflow-hidden">
         {restaurant.banner ? (
-          <img
+          <imgs
             src={restaurant.banner}
             alt={restaurant.name}
             className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500
@@ -100,11 +100,7 @@ function RestaurantCard({ restaurant }) {
 
       <div className={`p-3 ${isClosed ? 'opacity-60' : ''}`}>
         <h3 className="font-black text-slate-900 text-sm line-clamp-1">{restaurant.name}</h3>
-        {restaurant.address && (
-          <p className="flex items-center gap-1 text-slate-400 text-[11px] font-medium mt-0.5 line-clamp-1">
-            <MapPin size={9} className="shrink-0" /> {restaurant.address}
-          </p>
-        )}
+
         <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-50">
           <span className="flex items-center gap-1 text-slate-400 text-[11px] font-semibold">
             <Clock size={10} className="text-orange-400" />

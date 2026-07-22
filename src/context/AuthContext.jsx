@@ -5,6 +5,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
+  signInWithCustomToken,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -45,8 +46,11 @@ export function AuthProvider({ children }) {
 
   const logout = () => signOut(auth);
 
+  // Used after server-side OTP verification returns a Firebase custom token
+  const loginWithCustomToken = (token) => signInWithCustomToken(auth, token);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithCustomToken }}>
       {!loading && children}
     </AuthContext.Provider>
   );

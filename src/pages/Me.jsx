@@ -4,7 +4,7 @@ import {
   LogOut, Mail, ShoppingBag, ChevronRight,
   Package, Clock, MapPin, Star, Shield, Bell, HelpCircle, Heart
 } from 'lucide-react';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -32,7 +32,17 @@ export default function Me() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [profile, setProfile] = useState(null); // Firestore users/{uid} doc
 
+  /* ── Fetch Firestore profile (needed for phone-OTP users) ── */
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, 'users', user.uid)).then((snap) => {
+      if (snap.exists()) setProfile(snap.data());
+    }).catch(() => {});
+  }, [user?.uid]);
+
+  /* ── Orders listener ── */
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -52,8 +62,14 @@ export default function Me() {
     navigate('/auth');
   };
 
-  const initial = user?.displayName?.[0]?.toUpperCase()
-    || user?.email?.[0]?.toUpperCase()
+  /* ── Derived display values ──
+     Priority: Firestore profile > Firebase Auth object
+  */
+  const displayName = profile?.name || user?.displayName || '';
+  const displaySub  = profile?.phone || user?.email || '';
+
+  const initial = displayName?.[0]?.toUpperCase()
+    || displaySub?.[0]?.toUpperCase()
     || '?';
 
   const activeOrders = orders.filter((o) => !['delivered', 'cancelled'].includes(o.status));
@@ -115,11 +131,11 @@ export default function Me() {
               <span className="text-emerald-400 text-[10px] font-black uppercase tracking-wider">Verified</span>
             </div>
             <h1 className="text-xl font-black text-white truncate">
-              {user.displayName || 'Welcome!'}
+              {displayName || 'Welcome!'}
             </h1>
             <p className="text-slate-400 text-xs font-semibold flex items-center gap-1 mt-0.5 truncate">
               <Mail size={11} className="shrink-0" />
-              {user.email}
+              {displaySub || '—'}
             </p>
           </div>
         </div>

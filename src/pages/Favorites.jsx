@@ -15,9 +15,16 @@ export default function Favorites() {
 
   const handleAdd = (e, product) => {
     e.stopPropagation();
+    const cartRestaurantId = cart.length > 0 ? cart[0]?.restaurantId ?? null : null;
+    const isCrossRestaurant =
+      product.restaurantId &&
+      cartRestaurantId &&
+      product.restaurantId !== cartRestaurantId;
     addToCart(product);
-    setAddedId(product.id);
-    setTimeout(() => setAddedId(null), 1500);
+    if (!isCrossRestaurant) {
+      setAddedId(product.id);
+      setTimeout(() => setAddedId(null), 1500);
+    }
   };
 
   const getServiceStyles = (service) => {

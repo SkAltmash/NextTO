@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import {
   Plus, Minus, CheckCircle2, UtensilsCrossed,
@@ -113,9 +114,19 @@ export default function ProductCard({
   const handleAdd = (e) => {
     e.stopPropagation();
     if (isUnavailable) return;
+    // addToCart handles cross-restaurant conflict centrally via CartContext
     addToCart(product);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
+    // Only show the added animation if the item is from the same restaurant
+    // (cross-restaurant case: addToCart will show a toast instead of adding)
+    const cartRestaurantId = cart.length > 0 ? cart[0]?.restaurantId ?? null : null;
+    const isCrossRestaurant =
+      product.restaurantId &&
+      cartRestaurantId &&
+      product.restaurantId !== cartRestaurantId;
+    if (!isCrossRestaurant) {
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1500);
+    }
   };
 
   /* ── Render ────────────────────────────────────────────────────────── */

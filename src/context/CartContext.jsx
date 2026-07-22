@@ -70,7 +70,17 @@ export function CartProvider({ children }) {
   // ── Cart has delivery-type items (food/grocery/medicine) ──
   const hasDeliveryItems = cart.length > 0;
 
-  // ── Guarded addToCart: block if Pickup & Drop is in cart ──
+  // ── Current restaurant in cart (first item's restaurantId) ──
+  const cartRestaurantId = cart.length > 0 ? cart[0].restaurantId ?? null : null;
+
+  // ── clearAndAdd: wipe cart + pickup, then add new item (used for cross-restaurant) ──
+  const clearAndAdd = useCallback((item) => {
+    dispatch({ type: 'CLEAR' });
+    setPickupOrderDataRaw(null);
+    dispatch({ type: 'ADD', item });
+  }, []);
+
+  // ── Guarded addToCart: blocks Pickup & Drop conflict + cross-restaurant conflict ──
   const addToCart = useCallback((item) => {
     if (!isOnline) {
       toast.error('Store is currently paused. Please try again later.', { id: 'store-offline' });
@@ -80,8 +90,61 @@ export function CartProvider({ children }) {
       toast.error('Remove Pickup & Drop from cart first to add items', { id: 'cart-conflict' });
       return;
     }
+
+    // Block cross-restaurant: if cart has items from a different restaurant, prompt user
+    const currentRestaurantId = cart.length > 0 ? cart[0].restaurantId ?? null : null;
+    if (
+      item.restaurantId &&
+      currentRestaurantId &&
+      item.restaurantId !== currentRestaurantId
+    ) {
+      toast(
+        (t) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: '#1e293b' }}>
+              Start fresh?
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
+              Your cart has items from another restaurant. Clear it and add this item?
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+              <button
+                onClick={() => {
+                  clearAndAdd(item);
+                  toast.dismiss(t.id);
+                }}
+                style={{
+                  flex: 1, padding: '6px 12px', borderRadius: 10,
+                  background: '#f97316', color: '#fff',
+                  border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer',
+                }}
+              >
+                Yes, clear &amp; add
+              </button>
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                style={{
+                  flex: 1, padding: '6px 12px', borderRadius: 10,
+                  background: '#f1f5f9', color: '#475569',
+                  border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ),
+        {
+          id: 'cart-restaurant-conflict',
+          duration: 6000,
+          style: { maxWidth: 300, padding: '14px 16px' },
+        }
+      );
+      return;
+    }
+
     dispatch({ type: 'ADD', item });
-  }, [isOnline, pickupOrderData]);
+  }, [isOnline, pickupOrderData, cart, clearAndAdd]);
 
   const removeFromCart = (id) => dispatch({ type: 'REMOVE', id });
   const updateQty = (id, qty) => dispatch({ type: 'UPDATE_QTY', id, qty });
@@ -143,9 +206,10 @@ export function CartProvider({ children }) {
   return (
     <CartContext.Provider
       value={{
-        cart, addToCart, removeFromCart, updateQty, clearCart, totalItems, totalPrice,
+        cart, addToCart, clearAndAdd, removeFromCart, updateQty, clearCart, totalItems, totalPrice,
         pickupOrderData, setPickupOrderData,
         hasDeliveryItems,
+        cartRestaurantId,
         favorites, toggleFavorite, isFavorite,
         isOnline, storeLoading
       }}

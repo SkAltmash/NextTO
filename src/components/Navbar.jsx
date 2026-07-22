@@ -24,7 +24,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import CartDrawer from './CartDrawer';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /* ─── route definitions ─── */
@@ -54,6 +54,20 @@ export default function Navbar() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { totalItems, favorites } = useCart();
+
+  /* ── Firestore profile (for phone-OTP users who lack displayName/email on Auth) ── */
+  const [navProfile, setNavProfile] = useState(null);
+  useEffect(() => {
+    if (!user) { setNavProfile(null); return; }
+    getDoc(doc(db, 'users', user.uid))
+      .then((snap) => { if (snap.exists()) setNavProfile(snap.data()); })
+      .catch(() => {});
+  }, [user?.uid]);
+
+  const navDisplayName = navProfile?.name || user?.displayName || '';
+  const navSub         = navProfile?.phone || user?.email || '';
+  const navInitial     = (navDisplayName?.[0] || navSub?.[0] || '?').toUpperCase();
+  const navTitle       = navDisplayName || navSub || 'Profile';
 
   /* scroll detection — must be before any early return */
   const { scrollY } = useScroll();
@@ -306,10 +320,10 @@ export default function Navbar() {
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.94 }}
               onClick={() => navigate('/me')}
-              title={user.displayName || user.email}
+              title={navTitle}
               className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-400 to-amber-400 flex items-center justify-center text-white font-black text-sm shadow-md shadow-orange-300/30 shrink-0 cursor-pointer"
             >
-              {(user.displayName?.[0] || user.email?.[0] || '?').toUpperCase()}
+              {navInitial}
             </motion.button>
           ) : (
             <motion.button
@@ -598,7 +612,7 @@ export default function Navbar() {
                   )}
                   {/* avatar circle */}
                   <span className="relative z-10 w-6 h-6 rounded-lg bg-gradient-to-br from-orange-400 to-amber-400 flex items-center justify-center text-white font-black text-[11px] shadow-sm shadow-orange-300/30">
-                    {(user.displayName?.[0] || user.email?.[0] || '?').toUpperCase()}
+                    {navInitial}
                   </span>
                   <span className={`relative z-10 text-[10px] font-bold leading-none tracking-wide ${isActive ? 'text-orange-500' : 'text-slate-400'}`}>
                     Me

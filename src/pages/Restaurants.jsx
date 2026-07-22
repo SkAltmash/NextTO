@@ -44,7 +44,7 @@ function RestaurantCard({ restaurant }) {
       className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-100/30 overflow-hidden cursor-pointer group"
     >
       {/* Banner */}
-      <div className="relative h-24 sm:h-32 bg-gradient-to-br from-orange-100 to-amber-50 overflow-hidden">
+      <div className="relative h-40 sm:h-46  bg-gradient-to-br from-orange-100 to-amber-50 overflow-hidden">
         {restaurant.banner ? (
           <img src={restaurant.banner} alt={restaurant.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
@@ -68,11 +68,7 @@ function RestaurantCard({ restaurant }) {
 
       <div className="p-3 sm:p-4">
         <h3 className="font-black text-slate-900 text-sm sm:text-base line-clamp-1">{restaurant.name}</h3>
-        {restaurant.address && (
-          <p className="flex items-center gap-1 text-slate-400 text-[10px] sm:text-xs font-medium mt-1 line-clamp-1">
-            <MapPin size={10} className="shrink-0 text-orange-400" /> {restaurant.address}
-          </p>
-        )}
+
         {restaurant.categories?.length > 0 && (
           <div className="flex gap-1 mt-2 flex-wrap">
             {restaurant.categories.slice(0, 2).map((cat, i) => (

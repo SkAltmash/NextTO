@@ -20,9 +20,16 @@ function ProductResult({ product }) {
 
   const handleAdd = (e) => {
     e.stopPropagation();
+    const cartRestaurantId = cart.length > 0 ? cart[0]?.restaurantId ?? null : null;
+    const isCrossRestaurant =
+      product.restaurantId &&
+      cartRestaurantId &&
+      product.restaurantId !== cartRestaurantId;
     addToCart(product);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1400);
+    if (!isCrossRestaurant) {
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1400);
+    }
   };
 
   return (

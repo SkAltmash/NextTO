@@ -109,7 +109,7 @@ function HeroBannerSlider({ slides }) {
       {/* ── IMAGE AREA (clickable) ── */}
       <div
         className="relative w-full  overflow-hidden bg-slate-100"
-        style={{ aspectRatio: "16 / 6", minHeight: "160px" }}
+        style={{ aspectRatio: "16 / 6", }}
       >
         <AnimatePresence custom={direction} initial={false} mode="popLayout">
           <motion.div

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, limit, startAfter } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, LayoutGrid, AlertCircle, Search } from 'lucide-react';
+import { Loader2, LayoutGrid, AlertCircle, Search, ChevronDown } from 'lucide-react';
 import SEO from '../components/SEO';
+
+const PAGE_SIZE = 20;
 
 const SERVICE_COLORS = {
   food:     'from-orange-400 to-amber-500',
@@ -23,16 +25,51 @@ const getBadge = (st) => SERVICE_BADGE[st] ?? 'bg-slate-50 text-slate-600 border
 export default function Categories() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
 
+  const fetchCategories = async (isLoadMore = false) => {
+    if (isLoadMore) {
+      if (!lastDoc || loadingMore || !hasMore) return;
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setError('');
+    }
+
+    try {
+      const constraints = [orderBy('createdAt', 'desc'), limit(PAGE_SIZE)];
+      if (isLoadMore && lastDoc) {
+        constraints.push(startAfter(lastDoc));
+      }
+
+      const q = query(collection(db, 'categories'), ...constraints);
+      const snap = await getDocs(q);
+      const fetched = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      if (isLoadMore) {
+        setCategories((prev) => [...prev, ...fetched]);
+      } else {
+        setCategories(fetched);
+      }
+
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+    } catch (e) {
+      console.error(e);
+      setError('Failed to load categories.');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
-    const q = query(collection(db, 'categories'), orderBy('createdAt', 'desc'));
-    getDocs(q)
-      .then((snap) => setCategories(snap.docs.map((d) => ({ id: d.id, ...d.data() }))))
-      .catch((e) => { console.error(e); setError('Failed to load categories.'); })
-      .finally(() => setLoading(false));
+    fetchCategories(false);
   }, []);
 
   const filtered = categories.filter((c) =>
@@ -101,50 +138,74 @@ export default function Categories() {
         )}
 
         {!loading && !error && filtered.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {filtered.map((cat, i) => (
-              <motion.div
-                key={cat.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ y: -5 }}
-                transition={{ duration: 0.22, delay: i * 0.04 }}
-                onClick={() => navigate(`/categories/${cat.id}`)}
-                className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-100/30 overflow-hidden cursor-pointer group"
-              >
-                {/* Image */}
-                <div className={`relative h-32 bg-gradient-to-br ${getBg(cat.serviceType)} overflow-hidden`}>
-                  {cat.image ? (
-                    <img
-                      src={cat.image}
-                      alt={cat.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <LayoutGrid size={36} className="text-white/70" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                  {/* Service type badge */}
-                  {cat.serviceType && (
-                    <span className={`absolute top-2 left-2 text-[9px] font-black px-2 py-0.5 rounded-full border ${getBadge(cat.serviceType)} bg-white/90`}>
-                      {cat.serviceType}
-                    </span>
-                  )}
-                </div>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {filtered.map((cat, i) => (
+                <motion.div
+                  key={cat.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ y: -5 }}
+                  transition={{ duration: 0.22, delay: (i % PAGE_SIZE) * 0.03 }}
+                  onClick={() => navigate(`/categories/${cat.id}`)}
+                  className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-100/30 overflow-hidden cursor-pointer group"
+                >
+                  {/* Image */}
+                  <div className={`relative h-32 bg-gradient-to-br ${getBg(cat.serviceType)} overflow-hidden`}>
+                    {cat.image ? (
+                      <img
+                        src={cat.image}
+                        alt={cat.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <LayoutGrid size={36} className="text-white/70" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    {/* Service type badge */}
+                    {cat.serviceType && (
+                      <span className={`absolute top-2 left-2 text-[9px] font-black px-2 py-0.5 rounded-full border ${getBadge(cat.serviceType)} bg-white/90`}>
+                        {cat.serviceType}
+                      </span>
+                    )}
+                  </div>
 
-                <div className="p-3">
-                  <h3 className="font-black text-slate-900 text-sm line-clamp-1 group-hover:text-orange-500 transition-colors">
-                    {cat.name}
-                  </h3>
-                  <p className="text-orange-500 text-[11px] font-bold mt-1 flex items-center gap-0.5">
-                    Browse items →
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                  <div className="p-3">
+                    <h3 className="font-black text-slate-900 text-sm line-clamp-1 group-hover:text-orange-500 transition-colors">
+                      {cat.name}
+                    </h3>
+                    <p className="text-orange-500 text-[11px] font-bold mt-1 flex items-center gap-0.5">
+                      Browse items →
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {hasMore && (
+              <div className="mt-8 flex justify-center">
+                <button
+                  onClick={() => fetchCategories(true)}
+                  disabled={loadingMore}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-sm rounded-2xl shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-60 disabled:hover:scale-100 disabled:cursor-not-allowed"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Loading more…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Load More Categories</span>
+                      <ChevronDown size={18} />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -73,9 +73,17 @@ export default function ProductDetail() {
 
   const handleAddToCart = () => {
     if (!canAddToCart) return;
+    // Check cross-restaurant conflict before showing success animation
+    const cartRestaurantId = cart.length > 0 ? cart[0]?.restaurantId ?? null : null;
+    const isCrossRestaurant =
+      product?.restaurantId &&
+      cartRestaurantId &&
+      product.restaurantId !== cartRestaurantId;
     addToCart(product);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    if (!isCrossRestaurant) {
+      setAdded(true);
+      setTimeout(() => setAdded(false), 2000);
+    }
   };
 
   if (loading) return (

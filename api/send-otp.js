@@ -33,7 +33,8 @@ export default async function handler(req, res) {
   // Add test phone numbers (last 10 digits) here for Play Store reviewers.
   // These numbers bypass 2Factor and accept OTP "123456" automatically.
   const DEMO_PHONE_NUMBERS = [
-    '9999999999', // 10-digit string — remove before production release
+    '9999999999',
+    
   ];
 
   const last10 = cleanPhone.slice(-10);
