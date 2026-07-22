@@ -9,16 +9,16 @@ import SEO from '../components/SEO';
 const PAGE_SIZE = 20;
 
 const SERVICE_COLORS = {
-  food:     'from-orange-400 to-amber-500',
+  food: 'from-orange-400 to-amber-500 ',
   medicine: 'from-blue-400 to-cyan-500',
-  grocery:  'from-emerald-400 to-teal-500',
+  grocery: 'from-emerald-400 to-teal-500',
 };
 const getBg = (st) => SERVICE_COLORS[st] ?? 'from-slate-400 to-slate-500';
 
 const SERVICE_BADGE = {
-  food:     'bg-orange-50 text-orange-600 border-orange-100',
+  food: 'bg-orange-50 text-orange-600 border-orange-100',
   medicine: 'bg-blue-50 text-blue-600 border-blue-100',
-  grocery:  'bg-emerald-50 text-emerald-600 border-emerald-100',
+  grocery: 'bg-emerald-50 text-emerald-600 border-emerald-100',
 };
 const getBadge = (st) => SERVICE_BADGE[st] ?? 'bg-slate-50 text-slate-600 border-slate-100';
 

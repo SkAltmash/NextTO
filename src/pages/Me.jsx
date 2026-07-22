@@ -39,7 +39,7 @@ export default function Me() {
     if (!user) return;
     getDoc(doc(db, 'users', user.uid)).then((snap) => {
       if (snap.exists()) setProfile(snap.data());
-    }).catch(() => {});
+    }).catch(() => { });
   }, [user?.uid]);
 
   /* ── Orders listener ── */
@@ -66,7 +66,7 @@ export default function Me() {
      Priority: Firestore profile > Firebase Auth object
   */
   const displayName = profile?.name || user?.displayName || '';
-  const displaySub  = profile?.phone || user?.email || '';
+  const displaySub = profile?.phone || user?.email || '';
 
   const initial = displayName?.[0]?.toUpperCase()
     || displaySub?.[0]?.toUpperCase()

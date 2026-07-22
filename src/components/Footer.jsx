@@ -124,7 +124,7 @@ export default function Footer() {
         <div className="border-t border-slate-200/80 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col items-center md:items-start gap-1">
             <p className="text-[11px] sm:text-xs font-semibold text-slate-400 text-center md:text-left">
-              &copy; {currentYear} NextTo. All rights reserved. Made with <Heart size={10} className="inline text-red-500 fill-current animate-pulse" /> for delicious moments.
+              &copy; {currentYear} NextTo. All rights reserved. Made with <Heart size={10} className="inline text-red-400 fill-current animate-pulse" /> for delicious moments.
             </p>
             {/* Architected credit */}
             <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 flex items-center gap-1">
