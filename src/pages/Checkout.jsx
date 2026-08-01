@@ -1,75 +1,222 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin, ChevronDown, Loader2, CheckCircle2, AlertCircle,
   ShoppingBag, ArrowLeft, Package, Truck, Tag, Wallet, Banknote, Phone,
-  Bike, Navigation, PauseCircle, CloudRain,
+  Bike, Navigation, PauseCircle, CloudRain, Search, X, Bookmark, Save, Route,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useCheckout } from '../hooks/useCheckout';
 
-// ─── Delivery Location Dropdown ───────────────────────────────────────────────
+// ─── Delivery Location Modal Selector ─────────────────────────────────────────
 function LocationDropdown({ locations, selected, onSelect, disabled }) {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleOpen = () => {
+    if (disabled) return;
+    setSearchQuery('');
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+  };
+
+  const handleSelect = (loc) => {
+    onSelect(loc);
+    setOpen(false);
+  };
+
+  const filteredLocations = useMemo(() => {
+    if (!searchQuery.trim()) return locations;
+    const q = searchQuery.toLowerCase().trim();
+    return locations.filter((loc) =>
+      loc.name?.toLowerCase().includes(q)
+    );
+  }, [locations, searchQuery]);
 
   return (
-    <div className="relative">
+    <>
+      {/* Trigger Button */}
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-orange-400 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        onClick={handleOpen}
+        className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 hover:border-orange-400 bg-white text-sm font-semibold text-slate-800 focus:outline-none transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group shadow-xs hover:shadow-md"
       >
-        {selected ? (
-          <span className="flex items-center gap-2">
-            <MapPin size={15} className="text-orange-500 shrink-0" />
-            <span>{selected.name}</span>
+        <div className="flex items-center gap-3 min-w-0 flex-1 text-left">
+          <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0 group-hover:bg-orange-500 group-hover:text-white text-orange-500 transition-colors">
+            <MapPin size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            {selected ? (
+              <p className="font-bold text-slate-900 text-sm truncate">{selected.name}</p>
+            ) : (
+              <div>
+                <p className="text-slate-600 font-bold text-sm">Select your delivery area</p>
+                <p className="text-xs text-slate-400 font-medium">Choose from {locations.length || '100+'} available locations</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          <span className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-100 px-3.5 py-2 rounded-xl group-hover:bg-orange-500 group-hover:text-white transition-colors">
+            {selected ? 'Change Area' : 'Select Area'}
           </span>
-        ) : (
-          <span className="text-slate-400 flex items-center gap-2">
-            <MapPin size={15} className="shrink-0" />
-            Select your delivery area…
-          </span>
-        )}
-        <ChevronDown
-          size={16}
-          className={`text-slate-400 transition-transform duration-200 shrink-0 ${open ? 'rotate-180' : ''}`}
-        />
+        </div>
       </button>
 
+      {/* Modal Dialog */}
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-200/80 z-20 overflow-hidden"
-          >
-            {locations.map((loc, i) => (
-              <button
-                key={loc.id}
-                type="button"
-                onClick={() => { onSelect(loc); setOpen(false); }}
-                className={`w-full flex items-center justify-between px-4 py-3.5 text-sm font-semibold transition-colors cursor-pointer text-left
-                  ${i !== 0 ? 'border-t border-slate-50' : ''}
-                  ${selected?.id === loc.id
-                    ? 'bg-orange-50 text-orange-600'
-                    : 'text-slate-700 hover:bg-slate-50'}`}
-              >
-                <div className="flex items-center gap-2">
-                  {selected?.id === loc.id
-                    ? <CheckCircle2 size={15} className="text-orange-500" />
-                    : <div className="w-4 h-4 rounded-full border-2 border-slate-300" />}
-                  <span>{loc.name}</span>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleClose}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Content */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', duration: 0.3, bounce: 0.1 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] z-10 border border-slate-100"
+            >
+              {/* Modal Header */}
+              <div className="px-5 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-r from-orange-50/40 via-white to-amber-50/30 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
+                    <MapPin size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base leading-tight">Select Delivery Area</h3>
+                    <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                      {locations.length} delivery areas available
+                    </p>
+                  </div>
                 </div>
-              </button>
-            ))}
-          </motion.div>
+
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+                <div className="relative flex items-center">
+                  <Search size={18} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by area name or location..."
+                    autoFocus
+                    className="w-full pl-10 pr-10 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all shadow-xs"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Counter / Header badge */}
+              <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 text-xs font-extrabold text-slate-400 flex items-center justify-between shrink-0">
+                <span>
+                  {searchQuery ? `FOUND (${filteredLocations.length})` : `ALL AREAS (${locations.length})`}
+                </span>
+                {selected && (
+                  <span className="text-orange-600 font-bold">Current: {selected.name}</span>
+                )}
+              </div>
+
+              {/* Scrollable Locations List */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-[55vh]">
+                {filteredLocations.length > 0 ? (
+                  filteredLocations.map((loc) => {
+                    const isSelected = selected?.id === loc.id;
+                    return (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => handleSelect(loc)}
+                        className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-orange-50/90 border-2 border-orange-500 shadow-xs'
+                            : 'bg-white hover:bg-slate-50 border border-slate-150 hover:border-orange-200 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                              isSelected
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            {isSelected ? <CheckCircle2 size={18} /> : <MapPin size={18} />}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`text-sm font-bold truncate ${
+                                isSelected ? 'text-orange-950' : 'text-slate-800'
+                              }`}
+                            >
+                              {loc.name}
+                            </p>
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <span className="ml-2 px-2.5 py-1 rounded-lg bg-orange-500 text-white text-xs font-black shrink-0">
+                            Selected
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="py-12 px-4 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-400 flex items-center justify-center mx-auto mb-3">
+                      <Search size={22} />
+                    </div>
+                    <p className="font-bold text-slate-800 text-sm">No delivery areas found</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      No location matches "{searchQuery}". Try searching with a different keyword.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="mt-3 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-4 py-2 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Clear Search
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
 
@@ -108,6 +255,8 @@ export default function Checkout() {
     address, setAddress,
     mobile, setMobile,
     paymentMethod, setPaymentMethod,
+    saveAddress, setSaveAddress,
+    isAddressAutoFilled, handleSaveAddressNow,
 
     // Delivery locations
     locations, selectedLoc, setSelectedLoc, locLoading,
@@ -127,6 +276,7 @@ export default function Checkout() {
     deliveryCharge,
     rainSurcharge,
     rainMessage,
+    distanceServiceFee,
     couponCartDiscount,
     couponDeliveryDiscount,
     totalAmount,
@@ -195,6 +345,28 @@ export default function Checkout() {
                 <p className="font-black text-blue-800 text-sm">Rain Surcharge Applied</p>
                 <p className="text-blue-600 text-xs font-semibold mt-0.5 leading-relaxed">
                   {rainMessage || 'Rainy weather surcharge applied'} — +₹{rainSurcharge}
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Distance Service Fee Banner ── */}
+        <AnimatePresence>
+          {distanceServiceFee > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="flex items-start gap-3 bg-violet-50 border-2 border-violet-200 rounded-2xl px-4 py-4"
+            >
+              <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+                <Route size={20} className="text-violet-500" />
+              </div>
+              <div>
+                <p className="font-black text-violet-800 text-sm">Distance Service Fee</p>
+                <p className="text-violet-600 text-xs font-semibold mt-0.5 leading-relaxed">
+                  A service fee applies for your delivery distance — +₹{distanceServiceFee}
                 </p>
               </div>
             </motion.div>
@@ -326,11 +498,18 @@ export default function Checkout() {
 
         {/* ── Delivery / Pickup Address ── */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-3">
-          <div className="flex items-center gap-2.5 mb-1">
-            <MapPin size={17} className="text-orange-500" />
-            <h2 className="font-black text-slate-900 text-sm">
-              {isPickupDropOrder ? 'Pickup / Drop Address Details' : 'Delivery Address'}
-            </h2>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex items-center gap-2.5">
+              <MapPin size={17} className="text-orange-500" />
+              <h2 className="font-black text-slate-900 text-sm">
+                {isPickupDropOrder ? 'Pickup / Drop Address Details' : 'Delivery Address'}
+              </h2>
+            </div>
+            {isAddressAutoFilled && (
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl flex items-center gap-1 shrink-0">
+                <CheckCircle2 size={12} className="text-emerald-500" /> Saved Address Loaded
+              </span>
+            )}
           </div>
           <textarea
             value={address}
@@ -343,6 +522,29 @@ export default function Checkout() {
             rows={3}
             className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white transition-all resize-none"
           />
+
+          {/* Save Address Options */}
+          <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100/80">
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={saveAddress}
+                onChange={(e) => setSaveAddress(e.target.checked)}
+                className="w-4 h-4 rounded text-orange-500 focus:ring-orange-400 accent-orange-500 cursor-pointer"
+              />
+              <span>Save this address for future orders</span>
+            </label>
+
+            {address.trim() && (
+              <button
+                type="button"
+                onClick={handleSaveAddressNow}
+                className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+              >
+                <Bookmark size={13} /> Save Now
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Coupon Code ── */}
@@ -466,6 +668,14 @@ export default function Checkout() {
                   <CloudRain size={12} className="shrink-0" /> Rain surcharge
                 </span>
                 <span>+₹{rainSurcharge}</span>
+              </div>
+            )}
+            {distanceServiceFee > 0 && (
+              <div className="flex justify-between text-sm font-semibold text-violet-600">
+                <span className="flex items-center gap-1">
+                  <Route size={12} className="shrink-0" /> Distance service fee
+                </span>
+                <span>+₹{distanceServiceFee}</span>
               </div>
             )}
             {(couponCartDiscount > 0 || couponDeliveryDiscount > 0) && (

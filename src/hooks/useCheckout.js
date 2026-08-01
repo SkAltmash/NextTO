@@ -17,6 +17,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   collection,
   addDoc,
+  setDoc,
   serverTimestamp,
   query,
   where,
@@ -61,6 +62,11 @@ export function useCheckout() {
   const [mobile, setMobile] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cod');
 
+  // ── Saved Address State ─────────────────────────────────────────────────────
+  const [saveAddress, setSaveAddress] = useState(true);
+  const [isAddressAutoFilled, setIsAddressAutoFilled] = useState(false);
+  const [savedLocId, setSavedLocId] = useState('');
+
   // ── Delivery locations ──────────────────────────────────────────────────────
   const [locations, setLocations] = useState([]);
   const [selectedLoc, setSelectedLoc] = useState(null);
@@ -71,6 +77,9 @@ export function useCheckout() {
 
   // ── Rain surcharge ──────────────────────────────────────────────────────────
   const [rainCharges, setRainCharges] = useState(null); // { isEnabled, surchargeFlat, customerMessage }
+
+  // ── Distance service fee (from restaurant doc) ──────────────────────────────
+  const [distanceServiceFee, setDistanceServiceFee] = useState(0);
 
   // ── Coupon state ────────────────────────────────────────────────────────────
   const [couponCode, setCouponCode] = useState('');
@@ -96,6 +105,67 @@ export function useCheckout() {
       navigate('/auth', { replace: true });
     }
   }, [user, navigate]);
+
+  // ─── Fetch saved address & mobile from Firestore profile / localStorage ────
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        let loadedAddress = '';
+        let loadedMobile = '';
+        let loadedLocationId = '';
+
+        // 1. Check localStorage for fast instant pre-fill
+        const localAddress = localStorage.getItem(`nextto_saved_address_${user.uid}`);
+        const localMobile = localStorage.getItem(`nextto_saved_mobile_${user.uid}`);
+        const localLocId = localStorage.getItem(`nextto_saved_loc_${user.uid}`);
+
+        if (localAddress) loadedAddress = localAddress;
+        if (localMobile) loadedMobile = localMobile;
+        if (localLocId) loadedLocationId = localLocId;
+
+        // 2. Fetch Firestore profile (users/{uid})
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        if (userSnap.exists()) {
+          const uData = userSnap.data();
+          if (uData.address) loadedAddress = uData.address;
+          if (uData.mobile || uData.phone) loadedMobile = uData.mobile || uData.phone;
+          if (uData.locationId || uData.lastLocationId) loadedLocationId = uData.locationId || uData.lastLocationId;
+        } else if (user.phoneNumber) {
+          const cleanPhone = user.phoneNumber.replace('+91', '').trim();
+          if (cleanPhone && !loadedMobile) loadedMobile = cleanPhone;
+        }
+
+        if (cancelled) return;
+
+        if (loadedAddress) {
+          setAddress((prev) => prev || loadedAddress);
+          setIsAddressAutoFilled(true);
+        }
+        if (loadedMobile) {
+          setMobile((prev) => prev || loadedMobile);
+        }
+        if (loadedLocationId) {
+          setSavedLocId(loadedLocationId);
+        }
+      } catch (err) {
+        console.warn('[useCheckout] loadSavedAddress:', err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // ─── Auto-select saved delivery location when locations arrive ──────────────
+  useEffect(() => {
+    if (selectedLoc || locations.length === 0 || !savedLocId) return;
+    const matched = locations.find((l) => l.id === savedLocId);
+    if (matched) {
+      setSelectedLoc(matched);
+    }
+  }, [locations, selectedLoc, savedLocId]);
 
   // ─── Fetch active delivery locations ────────────────────────────────────────
   useEffect(() => {
@@ -136,6 +206,30 @@ export function useCheckout() {
     return () => { cancelled = true; };
   }, []);
 
+  // ─── Fetch distanceServiceFee from restaurant doc ────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    const firstRestId = cart.find((i) => i.restaurantId)?.restaurantId;
+    if (!firstRestId) {
+      setDistanceServiceFee(0);
+      return;
+    }
+
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'restaurants', firstRestId));
+        if (!cancelled) {
+          setDistanceServiceFee(numberValue(snap.exists() ? snap.data().distanceServiceFee : 0));
+        }
+      } catch (err) {
+        console.warn('[useCheckout] fetchDistanceServiceFee:', err);
+        if (!cancelled) setDistanceServiceFee(0);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [cart.map((i) => i.restaurantId).join(',')]);
+
   // ─── Derived values ──────────────────────────────────────────────────────────
   const isPickupDropOrder = !!pickupOrderData;
   const needsDeliveryArea = cart.length > 0;
@@ -150,11 +244,27 @@ export function useCheckout() {
   const rainSurcharge = rainCharges?.isEnabled ? numberValue(rainCharges.surchargeFlat) : 0;
   const rainMessage = rainCharges?.isEnabled ? (rainCharges.customerMessage ?? '') : '';
 
+  // distanceServiceFee is fetched from restaurants/{restaurantId}.distanceServiceFee (state above)
+
+  // Free delivery: only for food-only orders >= ₹500 (not grocery / medicine)
+  const FREE_DELIVERY_THRESHOLD = 500;
+  const hasNonFoodItem = cart.some(
+    (i) => i.serviceType === 'grocery' || i.serviceType === 'medicine',
+  );
+  const freeDelivery =
+    !isPickupDropOrder &&
+    !hasNonFoodItem &&
+    totalPrice >= FREE_DELIVERY_THRESHOLD &&
+    deliveryCharge > 0;
+
+  const effectiveDeliveryCharge = freeDelivery ? 0 : deliveryCharge;
+
   const totalAmount =
     totalPrice +
-    (needsDeliveryArea ? deliveryCharge : 0) +
+    (needsDeliveryArea ? effectiveDeliveryCharge : 0) +
     pickupDropCharge +
-    rainSurcharge -
+    rainSurcharge +
+    distanceServiceFee -
     couponCartDiscount -
     couponDeliveryDiscount;
 
@@ -252,13 +362,11 @@ export function useCheckout() {
       // ── Step 3: Resolve delivery partner for regular delivery ────────────────
       const selectedDeliveryPartnerId = selectedLoc?.assignedPartnerId ?? '';
       const selectedDeliveryPartnerName = selectedLoc?.assignedPartnerName ?? '';
-      let selectedDeliveryPartnerEarning = 0;
       let selectedDeliveryPartnerPhone = '';
       let isPartnerOnline = true;
 
       if (selectedDeliveryPartnerId) {
         const partner = await fetchPartner(selectedDeliveryPartnerId);
-        selectedDeliveryPartnerEarning = numberValue(partner?.commissionFlat);
         selectedDeliveryPartnerPhone = partner?.phone ?? '';
         isPartnerOnline = partner ? partner.isOnline !== false : true;
       }
@@ -305,10 +413,8 @@ export function useCheckout() {
         ? pickupDropDetails.assignedPartnerName
         : isPartnerOnline ? selectedDeliveryPartnerName : '';
 
-      const deliveryPartnerEarning = pickupDropOnly
-        ? pickupDropDetails.partnerEarning
-        : isPartnerOnline ? selectedDeliveryPartnerEarning : 0;
-
+      // Note: deliveryPartnerEarning is always stored (computed in Step 8)
+      // Even if no partner found, we store what they would earn when assigned.
       const deliveryPartnerNumber = pickupDropOnly
         ? ''
         : isPartnerOnline ? selectedDeliveryPartnerPhone : '';
@@ -327,6 +433,7 @@ export function useCheckout() {
                 name: d.name ?? '',
                 phone: d.phone ?? '',
                 logo: d.logo ?? '',
+                distanceServiceFee: numberValue(d.distanceServiceFee),
               };
             }
           });
@@ -342,14 +449,14 @@ export function useCheckout() {
       // ── Step 7: Build order items array ──────────────────────────────────────
       const pickupDropItem = pickupDropDetails
         ? [{
-            productId: 'pickup-drop',
-            productName: 'Pickup & Drop',
-            quantity: 1,
-            price: pickupDropDetails.totalCharge,
-            image: '',
-            restaurantId: '',
-            serviceType: 'pickup_drop',
-          }]
+          productId: 'pickup-drop',
+          productName: 'Pickup & Drop',
+          quantity: 1,
+          price: pickupDropDetails.totalCharge,
+          image: '',
+          restaurantId: '',
+          serviceType: 'pickup_drop',
+        }]
         : [];
 
       const orderItems = [
@@ -374,15 +481,41 @@ export function useCheckout() {
 
       // ── Step 8: Compute final totals ─────────────────────────────────────────
       const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
-      const orderDeliveryCharge = needsDeliveryArea ? deliveryCharge : 0;
+
+      // Free delivery: only food-only carts with subtotal >= ₹500
+      const orderHasNonFoodItem = cart.some(
+        (i) => i.serviceType === 'grocery' || i.serviceType === 'medicine',
+      );
+      const orderFreeDelivery =
+        !pickupDropDetails &&
+        !orderHasNonFoodItem &&
+        totalPrice >= FREE_DELIVERY_THRESHOLD &&
+        deliveryCharge > 0;
+      const orderDeliveryCharge = needsDeliveryArea
+        ? (orderFreeDelivery ? 0 : deliveryCharge)
+        : 0;
       const finalRainSurcharge = rainCharges?.isEnabled ? numberValue(rainCharges.surchargeFlat) : 0;
 
-      // 50% of rain surcharge goes to delivery partner
+      // Distance service fee from restaurant doc (already fetched in Step 6)
+      const firstRestId = restaurantIds[0] ?? '';
+      const restDocData = restaurantDataMap[firstRestId];
+      const finalDistanceServiceFee = numberValue(restDocData?.distanceServiceFee ?? distanceServiceFee);
+
+      // ── Delivery partner earning: NEW formula ─────────────────────────────────
+      // 70% of raw area delivery charge (always, even when free delivery is applied)
+      // + 50% of rain surcharge + 50% of distance service fee
+      // Always stored regardless of whether a partner is found or online.
+      // NOTE: When free delivery is granted, the store absorbs the partner cost —
+      //       so we use `deliveryCharge` (raw) NOT `orderDeliveryCharge` (effective).
+      const rawAreaCharge = needsDeliveryArea ? deliveryCharge : 0;
+      const areaFeePartnerShare = Math.round(rawAreaCharge * 0.7);
       const rainPartnerBonus = Math.round(finalRainSurcharge * 0.5);
-      const finalDeliveryPartnerEarning = deliveryPartnerEarning + rainPartnerBonus;
+      const distanceServiceFeePartnerBonus = Math.round(finalDistanceServiceFee * 0.5);
+      const finalDeliveryPartnerEarning =
+        areaFeePartnerShare + rainPartnerBonus + distanceServiceFeePartnerBonus;
 
       const finalTotalAmount =
-        subtotal + orderDeliveryCharge + finalRainSurcharge - finalCouponCartDiscount - finalCouponDeliveryDiscount;
+        subtotal + orderDeliveryCharge + finalRainSurcharge + finalDistanceServiceFee - finalCouponCartDiscount - finalCouponDeliveryDiscount;
 
       // ── Step 9: Save the order to Firestore ───────────────────────────────────
       const orderRef = await addDoc(collection(db, 'orders'), {
@@ -418,11 +551,14 @@ export function useCheckout() {
         locationName: selectedLoc?.name ?? '',
         deliveryArea: selectedLoc?.name ?? '',
         deliveryCharge: orderDeliveryCharge,
+        deliveryChargeOriginal: deliveryCharge,
+        freeDelivery: orderFreeDelivery,
         deliveryPartnerId,
         deliveryPartnerName,
         deliveryPartnerNumber,
         deliveryPartnerEarning: finalDeliveryPartnerEarning,
-        rainPartnerBonus,
+        // Earning breakdown (for admin/settlement reference)
+        areaFeePartnerShare,           // 70% of orderDeliveryCharge
 
         // Coupon
         appliedCouponId: finalCouponId,
@@ -433,6 +569,11 @@ export function useCheckout() {
         // Rain surcharge
         rainSurcharge: finalRainSurcharge,
         rainMessage: rainCharges?.isEnabled ? (rainCharges.customerMessage ?? '') : '',
+        rainPartnerBonus,               // 50% of rainSurcharge
+
+        // Distance service fee
+        distanceServiceFee: finalDistanceServiceFee,
+        distanceServiceFeePartnerBonus, // 50% of distanceServiceFee
 
         // Totals
         subtotal,
@@ -452,20 +593,46 @@ export function useCheckout() {
       });
 
       const orderId = orderRef.id;
+      // ── Step 10: Save address to user profile if enabled ──────────────────────
+      if (saveAddress && user?.uid) {
+        try {
+          const cleanAddr = address.trim();
+          const cleanMob = mobile.trim();
+          const locIdToSave = selectedLoc?.id || '';
 
-      // ── Step 10: Clear cart and navigate immediately ──────────────────────────
+          if (cleanAddr) localStorage.setItem(`nextto_saved_address_${user.uid}`, cleanAddr);
+          if (cleanMob) localStorage.setItem(`nextto_saved_mobile_${user.uid}`, cleanMob);
+          if (locIdToSave) localStorage.setItem(`nextto_saved_loc_${user.uid}`, locIdToSave);
+
+          setDoc(
+            doc(db, 'users', user.uid),
+            {
+              address: cleanAddr,
+              mobile: cleanMob,
+              phone: cleanMob,
+              lastLocationId: locIdToSave,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          ).catch((err) => console.warn('[useCheckout] save profile error:', err));
+        } catch (e) {
+          console.warn('[useCheckout] save address localStorage error:', e);
+        }
+      }
+
+      // ── Step 11: Clear cart and navigate immediately ──────────────────────────
       clearCart();
       toast.success('Order placed successfully! 🎉');
       navigate(`/order/${orderId}`, { replace: true });
 
-      // ── Step 11: Background — increment coupon usage (non-blocking) ──────────
+      // ── Step 12: Background — increment coupon usage (non-blocking) ──────────
       if (finalCouponId) {
         incrementCouponUsage(finalCouponId).catch((err) =>
           console.warn('[useCheckout] coupon usage increment failed (non-critical):', err)
         );
       }
 
-      // ── Step 12: Background — dispatch all notifications (non-blocking) ──────
+      // ── Step 13: Background — dispatch all notifications (non-blocking) ──────
       dispatchOrderNotifications({
         orderId,
         cart,
@@ -489,25 +656,64 @@ export function useCheckout() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canOrder, isOnline, couponResult, totalPrice, deliveryCharge, selectedLoc,
-      address, mobile, paymentMethod, cart, pickupOrderData, restaurantIds.join(','),
-      user, clearCart, navigate, needsDeliveryArea]);
+    address, mobile, paymentMethod, cart, pickupOrderData, restaurantIds.join(','),
+    user, clearCart, navigate, needsDeliveryArea, saveAddress]);
+
+  // ─── Manual Save Address Action ──────────────────────────────────────────────
+  const handleSaveAddressNow = useCallback(async () => {
+    if (!address.trim()) {
+      toast.error('Please enter an address to save');
+      return;
+    }
+    if (!user?.uid) return;
+
+    try {
+      const cleanAddr = address.trim();
+      const cleanMob = mobile.trim();
+      const locIdToSave = selectedLoc?.id || '';
+
+      if (cleanAddr) localStorage.setItem(`nextto_saved_address_${user.uid}`, cleanAddr);
+      if (cleanMob) localStorage.setItem(`nextto_saved_mobile_${user.uid}`, cleanMob);
+      if (locIdToSave) localStorage.setItem(`nextto_saved_loc_${user.uid}`, locIdToSave);
+
+      await setDoc(
+        doc(db, 'users', user.uid),
+        {
+          address: cleanAddr,
+          mobile: cleanMob,
+          phone: cleanMob,
+          lastLocationId: locIdToSave,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      setIsAddressAutoFilled(true);
+      toast.success('Address saved for future orders! 🏠');
+    } catch (err) {
+      console.error('[useCheckout] handleSaveAddressNow:', err);
+      toast.error('Failed to save address');
+    }
+  }, [address, mobile, selectedLoc?.id, user?.uid]);
 
   // ─── Public API ───────────────────────────────────────────────────────────────
   return {
     // Form state
-    address,        setAddress,
-    mobile,         setMobile,
-    paymentMethod,  setPaymentMethod,
+    address, setAddress,
+    mobile, setMobile,
+    paymentMethod, setPaymentMethod,
+    saveAddress, setSaveAddress,
+    isAddressAutoFilled, handleSaveAddressNow,
 
     // Delivery locations
     locations,
-    selectedLoc,    setSelectedLoc,
+    selectedLoc, setSelectedLoc,
     locLoading,
 
     // Coupon
-    couponCode,     setCouponCode,
+    couponCode, setCouponCode,
     couponResult,
-    couponError,    setCouponError,
+    couponError, setCouponError,
     couponLoading,
     handleApplyCoupon,
     handleRemoveCoupon,
@@ -516,9 +722,12 @@ export function useCheckout() {
     isPickupDropOrder,
     needsDeliveryArea,
     pickupDropCharge,
-    deliveryCharge,
+    deliveryCharge: effectiveDeliveryCharge,
+    rawDeliveryCharge: deliveryCharge,
+    freeDelivery,
     rainSurcharge,
     rainMessage,
+    distanceServiceFee,
     couponCartDiscount,
     couponDeliveryDiscount,
     totalAmount,

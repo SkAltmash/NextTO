@@ -276,8 +276,8 @@ export default function Me() {
           </div>
         </motion.div>
 
-        {/* ── Delivery Address snippet ── */}
-        {orders[0]?.address && (
+        {/* ── Saved Delivery Address snippet ── */}
+        {(profile?.address || orders[0]?.address) && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -288,8 +288,8 @@ export default function Me() {
               <MapPin size={18} className="text-orange-500" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Last Delivery Address</p>
-              <p className="font-bold text-slate-800 text-sm mt-0.5 truncate">{orders[0].address}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Saved Delivery Address</p>
+              <p className="font-bold text-slate-800 text-sm mt-0.5 truncate">{profile?.address || orders[0]?.address}</p>
             </div>
           </motion.div>
         )}
