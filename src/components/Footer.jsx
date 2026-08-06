@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   Phone, MapPin, Mail, ChevronRight, Heart, ExternalLink,
-  Zap, ShieldCheck, Navigation,
+  Zap, ShieldCheck, Navigation, Smartphone, Download,
 } from 'lucide-react';
 
 export default function Footer() {
@@ -68,6 +68,35 @@ export default function Footer() {
               <span className="text-[10px] font-extrabold text-slate-700 text-center leading-tight">{badge.label}</span>
             </div>
           ))}
+        </div>
+
+        {/* ── 2.5  Download Our App ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <h3 className="text-xs font-black text-orange-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Smartphone size={13} /> Download Our App
+          </h3>
+          <p className="text-xs font-semibold text-slate-500 mb-4">
+            Order food, groceries & more — faster on the NextTo app. Get exclusive deals & live order tracking.
+          </p>
+          <a
+            href="https://play.google.com/store/apps/details?id=com.sk_altamash18.UserApp"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-4 py-2.5 transition-colors shadow-md shadow-slate-900/20 group"
+          >
+            {/* Google Play icon (inline SVG) */}
+            <svg viewBox="0 0 24 24" className="w-6 h-6 shrink-0" fill="none">
+              <path d="M3.609 1.814 13.792 12 3.61 22.186a1.08 1.08 0 0 1-.61-.966V2.78c0-.4.226-.755.609-.966Z" fill="#4285F4"/>
+              <path d="m17.194 8.598-3.402 3.401 3.402 3.402 3.834-2.178a1.08 1.08 0 0 0 0-1.89l-3.834-2.735Z" fill="#FBBC04"/>
+              <path d="M3.609 1.814 13.792 12l3.402-3.402L6.155.766a1.08 1.08 0 0 0-2.546 1.048Z" fill="#34A853"/>
+              <path d="M3.609 22.186 6.155 23.234a1.08 1.08 0 0 0 2.546 1.048L17.194 15.4 13.792 12 3.609 22.186Z" fill="#EA4335"/>
+            </svg>
+            <div className="leading-tight">
+              <span className="text-[8px] font-semibold text-white/60 uppercase tracking-wider">GET IT ON</span>
+              <span className="block text-sm font-extrabold -mt-0.5 group-hover:text-orange-300 transition-colors">Google Play</span>
+            </div>
+            <Download size={14} className="text-white/40 group-hover:text-white transition-colors ml-1" />
+          </a>
         </div>
 
         {/* ── 3. Services + Quick Links + Contact ── */}

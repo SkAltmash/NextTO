@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import ScrollToTop from './components/ScrollToTop';
+import AppBanner from './components/AppBanner';
 import Home from './pages/Home';
 import Product from './pages/Product';
 import Order from './pages/Order';
@@ -66,6 +67,7 @@ function AppLayout() {
       />
       <Navbar />
       <ScrollToTop />
+      <AppBanner />
       <main className={mainClass}>
         <Routes>
           <Route path="/" element={<Home />} />
