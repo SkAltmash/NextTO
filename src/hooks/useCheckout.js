@@ -24,6 +24,8 @@ import {
   getDocs,
   doc,
   getDoc,
+  runTransaction,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCart } from '../context/CartContext';
@@ -48,6 +50,82 @@ async function fetchDeliveryLocation(location) {
   if (!location?.id) return location ?? {};
   const snap = await getDoc(doc(db, 'deliveryLocations', location.id));
   return snap.exists() ? { id: snap.id, ...snap.data() } : location;
+}
+
+// ─── Atomic delivery-partner assignment (ported from User App) ────────────────
+
+/**
+ * Atomically claims a single delivery partner.
+ * Uses a Firestore transaction so two simultaneous orders cannot claim the
+ * same partner: the transaction re-reads the document and aborts if the
+ * partner is already busy or offline.
+ */
+async function tryClaimPartner(partnerId) {
+  try {
+    return await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(doc(db, 'deliveryPartners', partnerId));
+      if (!snap.exists()) return null;
+      const d = snap.data();
+      // Double-check inside the transaction — prevents race conditions
+      if (d.isOnline !== true || d.isBusy !== false) return null;
+      transaction.update(snap.ref, { isBusy: true });
+      return {
+        id: snap.id,
+        name: d.name ?? d.partnerName ?? '',
+        earning: Number(d.commissionFlat ?? d.earning ?? 0),
+        telegramChatId: d.telegramChatId ?? '',
+        phone: d.phone ?? d.mobile ?? '',
+      };
+    });
+  } catch (e) {
+    console.warn(`[tryClaimPartner] Transaction failed for partner ${partnerId}:`, e);
+    return null;
+  }
+}
+
+/**
+ * Assignment algorithm:
+ *   Phase 1 — Try each partner assigned to the customer's delivery area
+ *             (online && !busy), in order. Stop at the first success.
+ *   Phase 2 — If all area partners are busy/offline, query ALL delivery
+ *             partners for the first available one, skipping area partners
+ *             already tried.
+ *   Returns null when no partner is available anywhere.
+ */
+async function assignDeliveryPartner(selectedLocation) {
+  // Collect area-assigned partner IDs — prefer the array field, fall back to
+  // the legacy single-ID field for backward compatibility.
+  const areaPartnerIds = selectedLocation.assignedPartnerIds?.length
+    ? selectedLocation.assignedPartnerIds
+    : selectedLocation.assignedPartnerId
+    ? [selectedLocation.assignedPartnerId]
+    : [];
+
+  // ── Phase 1: Area partners (highest priority) ──
+  for (const partnerId of areaPartnerIds) {
+    const result = await tryClaimPartner(partnerId);
+    if (result) return result;
+  }
+
+  // ── Phase 2: Global fallback across ALL delivery partners ──
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, 'deliveryPartners'),
+        where('isOnline', '==', true),
+        where('isBusy', '==', false),
+      ),
+    );
+    for (const partnerDoc of snap.docs) {
+      if (areaPartnerIds.includes(partnerDoc.id)) continue; // already tried in Phase 1
+      const result = await tryClaimPartner(partnerDoc.id);
+      if (result) return result;
+    }
+  } catch (e) {
+    console.warn('[assignDeliveryPartner] Global fallback query failed:', e);
+  }
+
+  return null; // No available partner found anywhere
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -359,16 +437,29 @@ export function useCheckout() {
         finalCouponCode = check.coupon.code;
       }
 
-      // ── Step 3: Resolve delivery partner for regular delivery ────────────────
-      const selectedDeliveryPartnerId = selectedLoc?.assignedPartnerId ?? '';
-      const selectedDeliveryPartnerName = selectedLoc?.assignedPartnerName ?? '';
+      // ── Step 3: Resolve delivery partner (atomic assignment, matching User App) ─
+      let selectedDeliveryPartnerId = '';
+      let selectedDeliveryPartnerName = '';
       let selectedDeliveryPartnerPhone = '';
       let isPartnerOnline = true;
+      let partnerTelegramChatId = '';
 
-      if (selectedDeliveryPartnerId) {
-        const partner = await fetchPartner(selectedDeliveryPartnerId);
-        selectedDeliveryPartnerPhone = partner?.phone ?? '';
-        isPartnerOnline = partner ? partner.isOnline !== false : true;
+      if (!pickupOrderData && selectedLoc) {
+        // Atomic multi-partner assignment: tries area partners first, then global fallback.
+        // Each attempt uses a Firestore transaction to atomically set isBusy=true
+        // so two simultaneous orders can never claim the same partner.
+        const partnerResult = await assignDeliveryPartner(selectedLoc);
+        if (partnerResult) {
+          selectedDeliveryPartnerId = partnerResult.id;
+          selectedDeliveryPartnerName = partnerResult.name;
+          selectedDeliveryPartnerPhone = partnerResult.phone;
+          partnerTelegramChatId = partnerResult.telegramChatId;
+          isPartnerOnline = true; // guaranteed by assignDeliveryPartner
+        } else {
+          // No available partner anywhere — order is saved without one;
+          // admin is notified via dispatchOrderNotifications below.
+          isPartnerOnline = false;
+        }
       }
 
       // ── Step 4: Resolve Pickup & Drop details ────────────────────────────────
@@ -407,17 +498,17 @@ export function useCheckout() {
 
       const deliveryPartnerId = pickupDropOnly
         ? pickupDropDetails.assignedPartnerId
-        : isPartnerOnline ? selectedDeliveryPartnerId : '';
+        : selectedDeliveryPartnerId;
 
       const deliveryPartnerName = pickupDropOnly
         ? pickupDropDetails.assignedPartnerName
-        : isPartnerOnline ? selectedDeliveryPartnerName : '';
+        : selectedDeliveryPartnerName;
 
       // Note: deliveryPartnerEarning is always stored (computed in Step 8)
       // Even if no partner found, we store what they would earn when assigned.
       const deliveryPartnerNumber = pickupDropOnly
         ? ''
-        : isPartnerOnline ? selectedDeliveryPartnerPhone : '';
+        : selectedDeliveryPartnerPhone;
 
       // ── Step 6: Fetch restaurant data (names, phones, logos) ────────────────
       const restaurantDataMap = {};
@@ -646,6 +737,7 @@ export function useCheckout() {
         address: address.trim(),
         user,
         mobile: mobile.trim(),
+        noPartnerAvailable: !deliveryPartnerId && !pickupDropOnly,
       });
 
     } catch (err) {

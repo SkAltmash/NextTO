@@ -19,6 +19,7 @@ import CategoryDetail from './pages/CategoryDetail';
 import PrivacyPolicy from './pages/PolicyPrivacy';
 import TermsOfService from './pages/PolicyTerms';
 import DeleteAccount from './pages/DeleteAccount';
+import Help from './pages/Help';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 
@@ -36,7 +37,8 @@ function AppLayout() {
     || pathname.startsWith('/order/')
     || pathname.startsWith('/restaurant/')
     || pathname.startsWith('/product/')
-    || pathname.startsWith('/categories/');
+    || pathname.startsWith('/categories/')
+    || pathname === '/help';
 
   // /auth        → no padding at all (full screen)
   // noMobilePad  → no mobile top gap (page handles own layout), keep desktop
@@ -82,6 +84,7 @@ function AppLayout() {
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/delete-account" element={<DeleteAccount />} />
+          <Route path="/help" element={<Help />} />
         </Routes>
       </main>
     </>

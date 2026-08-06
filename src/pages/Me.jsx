@@ -24,7 +24,7 @@ const product_ITEMS = [
   { icon: ShoppingBag, label: 'My Orders', sub: 'Track & view order history', path: '/order', color: 'bg-orange-50 text-orange-500' },
   { icon: Heart, label: 'Favorites', sub: 'Your handpicked express items', path: '/favorites', color: 'bg-red-50 text-red-500' },
   { icon: Bell, label: 'Notifications', sub: 'Order & promo alerts', path: null, color: 'bg-blue-50 text-blue-500', soon: true },
-  { icon: HelpCircle, label: 'Help & Support', sub: 'FAQs and contact us', path: null, color: 'bg-purple-50 text-purple-500', soon: true },
+  { icon: HelpCircle, label: 'Help & Support', sub: 'FAQs and contact us', path: '/help', color: 'bg-purple-50 text-purple-500' },
 ];
 
 export default function Me() {

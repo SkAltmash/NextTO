@@ -43,7 +43,6 @@ const mobileTabLinks = [
 /* ──────────────────────────────────────────────── */
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [allData, setAllData] = useState({ products: [], restaurants: [], categories: [] });
@@ -53,7 +52,7 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { totalItems, favorites } = useCart();
+  const { totalItems, favorites, cartDrawerOpen, openCartDrawer, closeCartDrawer } = useCart();
 
   /* ── Firestore profile (for phone-OTP users who lack displayName/email on Auth) ── */
   const [navProfile, setNavProfile] = useState(null);
@@ -139,7 +138,7 @@ export default function Navbar() {
 
   return (
     <>
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartDrawer open={cartDrawerOpen} onClose={closeCartDrawer} />
 
       {/* ═══════════════════════════════════════════
           MOBILE TOP NAVBAR  (< md)
@@ -179,7 +178,7 @@ export default function Navbar() {
           {/* Cart icon */}
           <motion.button
             whileTap={{ scale: 0.88 }}
-            onClick={() => setCartOpen(true)}
+            onClick={openCartDrawer}
             aria-label="Open cart"
             className="relative w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 cursor-pointer"
           >
@@ -284,7 +283,7 @@ export default function Navbar() {
           <motion.button
             whileHover={{ scale: 1.07 }}
             whileTap={{ scale: 0.93 }}
-            onClick={() => setCartOpen(true)}
+            onClick={openCartDrawer}
             aria-label="Open cart"
             className="relative w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 hover:bg-orange-100 transition-colors cursor-pointer"
           >

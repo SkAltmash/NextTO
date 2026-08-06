@@ -365,6 +365,41 @@ export async function notifyPickupDropPartner({
 }
 
 /**
+ * Sends a Telegram alert to the admin when no delivery partner could be
+ * assigned (all partners busy or offline). Matches User App behavior.
+ */
+async function notifyNoPartnerAvailable({
+  botToken,
+  orderId,
+  selectedLocName,
+  totalPrice,
+  deliveryCharge,
+  user,
+  mobile,
+}) {
+  if (!botToken) return;
+
+  try {
+    const adminChatId = await getAdminChatId();
+    if (!adminChatId) return;
+
+    const msg =
+      `🚨 <b>No Delivery Partner Available!</b>\n\n` +
+      `Order ID: <code>${escapeHtml(orderId)}</code>\n` +
+      `Area: <b>${escapeHtml(selectedLocName)}</b>\n` +
+      `Total: ₹${totalPrice + deliveryCharge}\n` +
+      `Customer: ${escapeHtml(user?.displayName ?? user?.email ?? '')}\n` +
+      `Mobile: ${escapeHtml(mobile)}\n\n` +
+      `No delivery partner is currently online and available.\n` +
+      `Please assign a partner manually from the Admin app.`;
+
+    await sendTelegramMessage(botToken, adminChatId, msg);
+  } catch (err) {
+    console.warn('[notify] No-partner admin alert skipped:', err.message);
+  }
+}
+
+/**
  * Master dispatcher — fires all applicable notifications in the background.
  * Never throws; individual channel failures are silently logged.
  *
@@ -384,6 +419,7 @@ export async function notifyPickupDropPartner({
  *   address: string,
  *   user: object,
  *   mobile: string,
+ *   noPartnerAvailable: boolean,
  * }} params
  */
 export function dispatchOrderNotifications(params) {
@@ -400,6 +436,7 @@ export function dispatchOrderNotifications(params) {
     address,
     user,
     mobile,
+    noPartnerAvailable,
   } = params;
 
   // 1️⃣ OneSignal Push notifications for restaurants (replacing Telegram restaurant notifications)
@@ -434,6 +471,13 @@ export function dispatchOrderNotifications(params) {
       user,
       mobile,
       selectedLocName,
+    }).catch(() => { });
+  }
+
+  // 4️⃣  No partner available — alert admin for manual assignment
+  if (noPartnerAvailable && !pickupDropOnly) {
+    notifyNoPartnerAvailable({
+      botToken, orderId, selectedLocName, totalPrice, deliveryCharge, user, mobile,
     }).catch(() => { });
   }
 }

@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import {
   ArrowLeft, ArrowRight, Clock, MapPin, Package, Loader2, AlertCircle,
   ClipboardList, CheckCircle2, ChefHat, Bike, XCircle,
   Phone, CreditCard, Banknote, Store, Copy, Check, FileImage, Navigation, Tag,
-  Cloud
+  Cloud, User
 } from 'lucide-react';
 
 // ─── Status Config ─────────────────────────────────────────────────────────────
@@ -28,6 +28,115 @@ const STATUS_COLOR = {
   delivered: { badge: 'bg-emerald-50 text-emerald-600 border-emerald-100', bar: 'bg-emerald-500', glow: 'shadow-emerald-200' },
   cancelled: { badge: 'bg-red-50 text-red-500 border-red-100', bar: 'bg-red-400', glow: 'shadow-red-200' },
 };
+
+const SHOW_PARTNER_STATUSES = new Set(['confirmed', 'preparing', 'out']);
+
+// ─── Delivery Partner Card ─────────────────────────────────────────────────────
+function DeliveryPartnerCard({ partnerId }) {
+  const [partner, setPartner] = useState(null);
+  const [partnerLoading, setPartnerLoading] = useState(true);
+
+  useEffect(() => {
+    if (!partnerId) return;
+    getDoc(doc(db, 'deliveryPartners', partnerId))
+      .then((snap) => { if (snap.exists()) setPartner(snap.data()); })
+      .catch(() => { })
+      .finally(() => setPartnerLoading(false));
+  }, [partnerId]);
+
+  if (partnerLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 flex items-center justify-center"
+      >
+        <Loader2 size={20} className="text-orange-500 animate-spin" />
+      </motion.div>
+    );
+  }
+  if (!partner) return null;
+
+  const statusColor = partner.isBusy
+    ? 'bg-amber-400'
+    : partner.isOnline
+      ? 'bg-emerald-400'
+      : 'bg-slate-400';
+
+  const statusText = partner.isBusy
+    ? 'On a delivery'
+    : partner.isOnline
+      ? 'Available'
+      : 'Offline';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.03 }}
+      className="bg-gradient-to-br from-orange-50 to-white rounded-3xl border border-orange-100/60 shadow-sm overflow-hidden"
+    >
+      {/* Header */}
+      <div className="px-5 pt-4 pb-3 flex items-center gap-2">
+        <div className="w-7 h-7 rounded-xl bg-orange-100 flex items-center justify-center">
+          <Bike size={14} className="text-orange-500" />
+        </div>
+        <h2 className="font-black text-slate-900 text-sm">Delivery Partner</h2>
+      </div>
+
+      {/* Partner info */}
+      <div className="px-5 pb-4 flex items-center gap-3.5">
+        {/* Avatar */}
+        <div className="relative">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border-2 ${
+            partner.isOnline ? 'border-orange-400 bg-orange-50' : 'border-slate-200 bg-slate-50'
+          }`}>
+            {partner.avatarUrl ? (
+              <img src={partner.avatarUrl} alt={partner.name}
+                className="w-full h-full rounded-2xl object-cover" />
+            ) : (
+              <User size={22} className={partner.isOnline ? 'text-orange-400' : 'text-slate-400'} />
+            )}
+          </div>
+          {/* Online dot */}
+          <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${statusColor}`} />
+        </div>
+
+        {/* Name + status */}
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-slate-900 text-sm truncate">{partner.name ?? 'Partner'}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${statusColor}`} />
+            <span className="text-xs font-semibold text-slate-400">{statusText}</span>
+          </div>
+        </div>
+
+        {/* Call button */}
+        {partner.phone && (
+          <a
+            href={`tel:${partner.phone}`}
+            className="w-10 h-10 rounded-2xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors shrink-0"
+            title={`Call ${partner.name}`}
+          >
+            <Phone size={16} className="text-emerald-600" />
+          </a>
+        )}
+      </div>
+
+      {/* Phone row */}
+      {partner.phone && (
+        <a
+          href={`tel:${partner.phone}`}
+          className="flex items-center gap-2 px-5 py-3 border-t border-orange-100/60 hover:bg-orange-50/50 transition-colors"
+        >
+          <Phone size={12} className="text-emerald-500 shrink-0" />
+          <span className="text-sm font-bold text-slate-700">{partner.phone}</span>
+          <span className="text-[10px] font-semibold text-slate-400 ml-auto">Tap to call</span>
+        </a>
+      )}
+    </motion.div>
+  );
+}
 
 // ─── Step Tracker ──────────────────────────────────────────────────────────────
 function StepTracker({ status }) {
@@ -248,6 +357,14 @@ export default function OrderDetail() {
           </div>
           <StepTracker status={order?.status} />
         </motion.div>
+
+        {/* ── Delivery Partner Card ── */}
+        {(() => {
+          const partnerId = order?.deliveryPartnerId || order?.pickupDropPartnerId;
+          return partnerId && SHOW_PARTNER_STATUSES.has(order?.status) ? (
+            <DeliveryPartnerCard partnerId={partnerId} />
+          ) : null;
+        })()}
 
         {/* ── Items ── */}
         <motion.div

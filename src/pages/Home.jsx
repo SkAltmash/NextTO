@@ -4,6 +4,7 @@ import ServicesSection from '../components/ServicesSection'
 import { RestaurantsSection } from '../components/RestaurantsSection'
 import SpecialsSection from '../components/SpecialsSection'
 import CategoriesSection from '../components/CategoriesSection'
+import GrocerySection from '../components/GrocerySection'
 import WhatsAppCTA from '../components/WhatsAppCTA'
 import WhyChooseUs from '../components/WhyChooseUs'
 import Footer from '../components/Footer'
@@ -21,6 +22,8 @@ function Home() {
             <ServicesSection />
             <CategoriesSection />
             <RestaurantsSection />
+
+            <GrocerySection />
             <Footer />
         </div>
     )

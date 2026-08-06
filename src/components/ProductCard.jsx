@@ -93,9 +93,9 @@ export default function ProductCard({
   }, [product.restaurantId, isRestaurantClosed]);
 
   /* ── Derived flags ─────────────────────────────────────────────────── */
-  const isProductUnavailable  = product.isAvailable === false;
-  const isClosedByRestaurant  = isRestaurantClosed || !restaurantOpen;
-  const isUnavailable         = isProductUnavailable || isClosedByRestaurant;
+  const isProductUnavailable = product.isAvailable === false;
+  const isClosedByRestaurant = isRestaurantClosed || !restaurantOpen;
+  const isUnavailable = isProductUnavailable || isClosedByRestaurant;
 
   const isSpecial =
     showSpecialBadge &&
@@ -116,7 +116,7 @@ export default function ProductCard({
     if (isUnavailable) return;
     // addToCart handles cross-restaurant conflict centrally via CartContext
     addToCart(product);
-    // Only show the added animation if the item is from the same restaurant
+    // Only navigate + animate if the item is from the same restaurant
     // (cross-restaurant case: addToCart will show a toast instead of adding)
     const cartRestaurantId = cart.length > 0 ? cart[0]?.restaurantId ?? null : null;
     const isCrossRestaurant =
@@ -145,7 +145,7 @@ export default function ProductCard({
     >
 
       {/* ── Image ──────────────────────────────────────────────────────── */}
-      <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
+      <div className="relative w-full aspect-[4/4] bg-slate-100 overflow-hidden">
         {product.images?.[0] ? (
           <img
             src={product.images[0]}

@@ -63,7 +63,7 @@ function RestaurantCard({ restaurant }) {
       {/* Banner */}
       <div className="relative h-36 bg-gradient-to-br from-orange-100 to-amber-50 overflow-hidden">
         {restaurant.banner ? (
-          <imgs
+          <img
             src={restaurant.banner}
             alt={restaurant.name}
             className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500

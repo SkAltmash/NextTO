@@ -45,6 +45,11 @@ export function CartProvider({ children }) {
     }
   });
 
+  // ── Cart drawer open state (shared so any component can open it) ──
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  const openCartDrawer = useCallback(() => setCartDrawerOpen(true), []);
+  const closeCartDrawer = useCallback(() => setCartDrawerOpen(false), []);
+
   const [pickupOrderData, setPickupOrderDataRaw] = useState(() => {
     try {
       const saved = localStorage.getItem(PICKUP_STORAGE_KEY);
@@ -78,6 +83,7 @@ export function CartProvider({ children }) {
     dispatch({ type: 'CLEAR' });
     setPickupOrderDataRaw(null);
     dispatch({ type: 'ADD', item });
+    setCartDrawerOpen(true);
   }, []);
 
   // ── Guarded addToCart: blocks Pickup & Drop conflict + cross-restaurant conflict ──
@@ -144,6 +150,7 @@ export function CartProvider({ children }) {
     }
 
     dispatch({ type: 'ADD', item });
+    setCartDrawerOpen(true);
   }, [isOnline, pickupOrderData, cart, clearAndAdd]);
 
   const removeFromCart = (id) => dispatch({ type: 'REMOVE', id });
@@ -211,7 +218,8 @@ export function CartProvider({ children }) {
         hasDeliveryItems,
         cartRestaurantId,
         favorites, toggleFavorite, isFavorite,
-        isOnline, storeLoading
+        isOnline, storeLoading,
+        cartDrawerOpen, openCartDrawer, closeCartDrawer,
       }}
     >
       {children}
