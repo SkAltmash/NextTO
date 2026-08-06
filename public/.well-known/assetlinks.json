@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.sk_altamash18.UserApp",
+      "sha256_cert_fingerprints": [
+        "22:81:9B:C2:39:85:B1:6D:B1:84:E5:B0:D0:CF:EC:53:BC:39:F6:7B:D6:CE:47:9E:F3:D1:82:93:45:AA:87:CE"
+      ]
+    }
+  }
+]
