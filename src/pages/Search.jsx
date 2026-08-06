@@ -1,18 +1,49 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search as SearchIcon, X, Flame, UtensilsCrossed,
-  Clock, MapPin, ChevronRight, Loader2, Plus, Minus, CheckCircle2, Package, MessageSquare, Heart, LayoutGrid, PauseCircle
+  Clock, MapPin, ChevronRight, Loader2, Plus, Minus, CheckCircle2, Package, MessageSquare, Heart, LayoutGrid, PauseCircle, Info
 } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query as fsQuery, where, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCart } from '../context/CartContext';
 
 const POPULAR = ['Biryani', 'Pizza', 'Burger', 'Momos', 'Grocery', 'Medicine'];
+const MIN_CHARS = 4;
+const DEBOUNCE_MS = 600;
+
+/* ─── debounce hook ─── */
+function useDebounce(value, delay) {
+  const [d, setD] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setD(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return d;
+}
+
+/* ─── highlight matching words ─── */
+function HighlightText({ text, searchWords, className }) {
+  if (!searchWords.length || !text) return <span className={className}>{text}</span>;
+  const escaped = searchWords.filter(w => w.length >= 2).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (!escaped.length) return <span className={className}>{text}</span>;
+  const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <span className={className}>
+      {parts.map((part, i) => {
+        const isMatch = escaped.some(e => part.toLowerCase() === e.toLowerCase());
+        return isMatch
+          ? <mark key={i} className="bg-orange-100 text-orange-600 font-black rounded px-0.5">{part}</mark>
+          : <span key={i}>{part}</span>;
+      })}
+    </span>
+  );
+}
 
 /* ─── product result card ─── */
-function ProductResult({ product }) {
+function ProductResult({ product, searchWords }) {
   const { addToCart, cart, updateQty, toggleFavorite, isFavorite, isOnline } = useCart();
   const navigate = useNavigate();
   const [added, setAdded] = useState(false);
@@ -65,7 +96,7 @@ function ProductResult({ product }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-black text-slate-900 text-sm truncate flex items-center gap-1.5 flex-wrap">
-          <span>{product.name}</span>
+          <HighlightText text={product.name} searchWords={searchWords} />
           {product.serviceType && (
             <span className={`inline-block border text-[10px] font-black px-2 py-0.5 rounded-full capitalize ${
               product.serviceType.toLowerCase() === 'food' ? 'bg-orange-50 text-orange-600 border-orange-100' :
@@ -77,7 +108,9 @@ function ProductResult({ product }) {
             </span>
           )}
         </p>
-        <p className="text-slate-400 text-xs line-clamp-1 font-medium mt-0.5">{product.description}</p>
+        <p className="text-slate-400 text-xs line-clamp-1 font-medium mt-0.5">
+          <HighlightText text={product.description} searchWords={searchWords} />
+        </p>
         <div className="flex items-center gap-2 mt-1">
           <span className="text-orange-500 font-black text-sm">₹{product.discountPrice ?? product.price}</span>
           {product.discountPrice && product.price && (
@@ -126,7 +159,7 @@ const CAT_GRADIENT = {
   medicine: 'from-blue-400 to-cyan-500',
   grocery:  'from-emerald-400 to-teal-500',
 };
-function CategoryResult({ category }) {
+function CategoryResult({ category, searchWords }) {
   const navigate = useNavigate();
   return (
     <motion.div
@@ -142,7 +175,9 @@ function CategoryResult({ category }) {
         }
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-black text-slate-900 text-sm truncate">{category.name}</p>
+        <p className="font-black text-slate-900 text-sm truncate">
+          <HighlightText text={category.name} searchWords={searchWords} />
+        </p>
         {category.serviceType && (
           <span className="text-[10px] font-black text-slate-400 capitalize">{category.serviceType}</span>
         )}
@@ -152,7 +187,7 @@ function CategoryResult({ category }) {
   );
 }
 
-function RestaurantResult({ restaurant }) {
+function RestaurantResult({ restaurant, searchWords }) {
   const navigate = useNavigate();
   return (
     <motion.div
@@ -168,7 +203,9 @@ function RestaurantResult({ restaurant }) {
         }
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-black text-slate-900 text-sm truncate">{restaurant.name}</p>
+        <p className="font-black text-slate-900 text-sm truncate">
+          <HighlightText text={restaurant.name} searchWords={searchWords} />
+        </p>
         {restaurant.address && (
           <p className="flex items-center gap-1 text-slate-400 text-xs font-medium mt-0.5 truncate">
             <MapPin size={10} className="shrink-0" /> {restaurant.address}
@@ -195,30 +232,31 @@ function RestaurantResult({ restaurant }) {
 ═══════════════════════════════════════════ */
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [query, setQuery] = useState(searchParams.get('q') ?? '');
+  const [queryText, setQueryText] = useState(searchParams.get('q') ?? '');
+  const debounced = useDebounce(queryText, DEBOUNCE_MS);
   const [products, setProducts] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [allData, setAllData] = useState({ products: [], restaurants: [], categories: [] });
+  // Only restaurants & categories are bulk-fetched (small collections)
+  const [restData, setRestData] = useState([]);
+  const [catData, setCatData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
+  const [searched, setSearched] = useState(false);
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
-  /* load all data once */
+  /* load restaurants & categories once (small collections) */
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const [pSnap, rSnap, cSnap] = await Promise.all([
-          getDocs(collection(db, 'products')),
+        const [rSnap, cSnap] = await Promise.all([
           getDocs(collection(db, 'restaurants')),
           getDocs(collection(db, 'categories')),
         ]);
-        const p = pSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const r = rSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const c = cSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setAllData({ products: p, restaurants: r, categories: c });
+        setRestData(rSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setCatData(cSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
       } catch (e) {
         console.error(e);
       } finally {
@@ -230,30 +268,78 @@ export default function Search() {
     inputRef.current?.focus();
   }, []);
 
-  /* filter whenever query changes */
+  /* search when debounced query changes */
   useEffect(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) { setProducts([]); setRestaurants([]); setCategories([]); return; }
-    setProducts(allData.products.filter((p) =>
-      p.name?.toLowerCase().includes(q) ||
-      p.categoryId?.toLowerCase().includes(q) ||
-      p.serviceType?.toLowerCase().includes(q)
-    ));
-    setRestaurants(allData.restaurants.filter((r) =>
-      r.name?.toLowerCase().includes(q) ||
-      r.address?.toLowerCase().includes(q) ||
-      r.categories?.some((c) => c.toLowerCase().includes(q))
-    ));
-    setCategories(allData.categories.filter((c) =>
-      c.name?.toLowerCase().includes(q) ||
-      c.serviceType?.toLowerCase().includes(q)
-    ));
-    /* update URL param */
-    setSearchParams(q ? { q } : {}, { replace: true });
-  }, [query, allData]);
+    const q = debounced.trim().toLowerCase();
+
+    if (!q || q.length < MIN_CHARS) {
+      setProducts([]);
+      setRestaurants([]);
+      setCategories([]);
+      setSearched(false);
+      if (q) setSearchParams({}, { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    const searchWords = q.split(/\s+/).filter(w => w.length >= 1);
+
+    // Products: use array-contains on searchKeywords (cheap — only matching docs fetched)
+    const productPromises = searchWords.map(w =>
+      getDocs(fsQuery(collection(db, 'products'), where('searchKeywords', 'array-contains', w), limit(30)))
+        .then(s => s.docs.map(d => ({ id: d.id, ...d.data() })))
+        .catch(() => [])
+    );
+
+    Promise.all(productPromises).then(results => {
+      if (cancelled) return;
+
+      // Deduplicate products
+      const seen = new Set();
+      const dedupedProducts = [];
+      results.flat().forEach(p => {
+        if (!seen.has(p.id) && p.isAvailable !== false) {
+          seen.add(p.id);
+          dedupedProducts.push(p);
+        }
+      });
+
+      // Filter restaurants & categories client-side (already in memory)
+      const filteredRest = restData.filter((r) =>
+        searchWords.some(w =>
+          r.name?.toLowerCase().includes(w) ||
+          r.address?.toLowerCase().includes(w) ||
+          r.categories?.some((c) => c.toLowerCase().includes(w))
+        )
+      );
+      const filteredCat = catData.filter((c) =>
+        searchWords.some(w =>
+          c.name?.toLowerCase().includes(w) ||
+          c.serviceType?.toLowerCase().includes(w)
+        )
+      );
+
+      setProducts(dedupedProducts);
+      setRestaurants(filteredRest);
+      setCategories(filteredCat);
+      setSearched(true);
+      setLoading(false);
+      setSearchParams(q ? { q } : {}, { replace: true });
+    });
+
+    return () => { cancelled = true; };
+  }, [debounced, restData, catData]);
+
+  const activeSearchWords = useMemo(
+    () => queryText.trim().toLowerCase().split(/\s+/).filter(w => w.length >= 2),
+    [queryText]
+  );
 
   const hasResults = products.length > 0 || restaurants.length > 0 || categories.length > 0;
-  const isSearching = query.trim().length > 0;
+  const isSearching = queryText.trim().length > 0;
+  const tooShort = queryText.trim().length > 0 && queryText.trim().length < MIN_CHARS && !loading && !hasResults;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 pb-28 md:pb-16">
@@ -265,18 +351,18 @@ export default function Search() {
             <input
               ref={inputRef}
               type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={queryText}
+              onChange={(e) => setQueryText(e.target.value)}
               placeholder="Search food, restaurants, grocery…"
               className="w-full pl-11 pr-10 py-3.5 bg-transparent text-slate-800 font-semibold text-sm placeholder-slate-400 outline-none"
             />
             <AnimatePresence>
-              {query && (
+              {queryText && (
                 <motion.button
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  onClick={() => setQuery('')}
+                  onClick={() => setQueryText('')}
                   className="absolute right-3 p-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-500 transition-colors cursor-pointer"
                 >
                   <X size={12} />
@@ -307,7 +393,7 @@ export default function Search() {
                 {POPULAR.map((item) => (
                   <button
                     key={item}
-                    onClick={() => setQuery(item)}
+                    onClick={() => setQueryText(item)}
                     className="bg-white border border-slate-200 hover:border-orange-300 hover:bg-orange-50 text-slate-600 hover:text-orange-600 px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-sm"
                   >
                     {item}
@@ -318,8 +404,23 @@ export default function Search() {
           </motion.div>
         )}
 
+        {/* Type more hint */}
+        {tooShort && !loading && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 mt-2"
+          >
+            <Info size={18} className="text-orange-500 shrink-0" />
+            <p className="text-sm font-semibold text-orange-800 flex-1">
+              Type at least <span className="font-black">4 characters</span> to search
+            </p>
+            <span className="text-xs font-black text-orange-500">{queryText.trim().length}/{MIN_CHARS}</span>
+          </motion.div>
+        )}
+
         {/* No results */}
-        {!loading && isSearching && fetched && !hasResults && (
+        {!loading && searched && isSearching && queryText.trim().length >= MIN_CHARS && !hasResults && (
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -329,19 +430,19 @@ export default function Search() {
               <SearchIcon size={28} />
             </div>
             <div className="space-y-2">
-              <p className="font-black text-slate-800 text-lg">No results for "{query}"</p>
+              <p className="font-black text-slate-800 text-lg">No results for "{queryText}"</p>
               <p className="text-slate-400 text-xs sm:text-sm font-semibold max-w-xs mx-auto">
                 We couldn't find matches on our website, but we can still deliver it to you!
               </p>
             </div>
             
             <a
-              href={`https://wa.me/917972081926?text=${encodeURIComponent(`Hello Food Express! I searched for "${query}" on your website but couldn't find it. Can I order this here?`)}`}
+              href={`https://wa.me/917972081926?text=${encodeURIComponent(`Hello Food Express! I searched for "${queryText}" on your website but couldn't find it. Can I order this here?`)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full inline-flex items-center justify-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-xs sm:text-sm cursor-pointer"
             >
-              <MessageSquare size={16} /> Order "{query}" on WhatsApp
+              <MessageSquare size={16} /> Order "{queryText}" on WhatsApp
             </a>
           </motion.div>
         )}
@@ -357,7 +458,7 @@ export default function Search() {
                   <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Categories ({categories.length})</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
-                  {categories.map((c) => <CategoryResult key={c.id} category={c} />)}
+                  {categories.map((c) => <CategoryResult key={c.id} category={c} searchWords={activeSearchWords} />)}
                 </div>
               </div>
             )}
@@ -369,7 +470,7 @@ export default function Search() {
                   Items ({products.length})
                 </p>
                 <div className="space-y-2.5">
-                  {products.map((p) => <ProductResult key={p.id} product={p} />)}
+                  {products.map((p) => <ProductResult key={p.id} product={p} searchWords={activeSearchWords} />)}
                 </div>
               </div>
             )}
@@ -381,7 +482,7 @@ export default function Search() {
                   Restaurants ({restaurants.length})
                 </p>
                 <div className="space-y-2.5">
-                  {restaurants.map((r) => <RestaurantResult key={r.id} restaurant={r} />)}
+                  {restaurants.map((r) => <RestaurantResult key={r.id} restaurant={r} searchWords={activeSearchWords} />)}
                 </div>
               </div>
             )}

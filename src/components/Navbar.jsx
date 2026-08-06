@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   motion,
@@ -8,23 +8,17 @@ import {
 } from 'framer-motion';
 import {
   Home,
-  UtensilsCrossed,
   ShoppingBag,
   Search as SearchIcon,
   ShoppingCart,
   LogIn,
-  X,
-  Package,
-  MapPin,
-  MessageSquare,
   Store,
   Heart,
-  LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import CartDrawer from './CartDrawer';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /* ─── route definitions ─── */
@@ -43,11 +37,6 @@ const mobileTabLinks = [
 /* ──────────────────────────────────────────────── */
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [allData, setAllData] = useState({ products: [], restaurants: [], categories: [] });
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const searchRef = useRef(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -72,66 +61,17 @@ export default function Navbar() {
   const { scrollY } = useScroll();
   useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 20));
 
-  /* Ctrl+K shortcut */
+  /* Ctrl+K shortcut — navigate to /search */
   useEffect(() => {
     const down = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setSearchOpen((o) => !o);
+        navigate('/search');
       }
-      if (e.key === 'Escape') setSearchOpen(false);
     };
     window.addEventListener('keydown', down);
     return () => window.removeEventListener('keydown', down);
-  }, []);
-
-  /* load search data once on first open */
-  useEffect(() => {
-    if (searchOpen && !dataLoaded) {
-      Promise.all([
-        getDocs(collection(db, 'products')),
-        getDocs(collection(db, 'restaurants')),
-        getDocs(collection(db, 'categories')),
-      ]).then(([pSnap, rSnap, cSnap]) => {
-        setAllData({
-          products: pSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-          restaurants: rSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-          categories: cSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-        });
-        setDataLoaded(true);
-      }).catch(console.error);
-    }
-    if (searchOpen) setTimeout(() => searchRef.current?.focus(), 80);
-  }, [searchOpen]);
-
-  /* filtered results */
-  const q = searchQuery.trim().toLowerCase();
-  const resultCategories = q
-    ? allData.categories.filter((c) =>
-      c.name?.toLowerCase().includes(q) ||
-      c.serviceType?.toLowerCase().includes(q)
-    ).slice(0, 4)
-    : [];
-  const resultProducts = q
-    ? allData.products.filter((p) =>
-      p.name?.toLowerCase().includes(q) ||
-      p.serviceType?.toLowerCase().includes(q)
-    ).slice(0, 5)
-    : [];
-  const resultRestaurants = q
-    ? allData.restaurants.filter((r) =>
-      r.name?.toLowerCase().includes(q) ||
-      r.address?.toLowerCase().includes(q)
-    ).slice(0, 3)
-    : [];
-  const hasResults = resultCategories.length > 0 || resultProducts.length > 0 || resultRestaurants.length > 0;
-
-  const closeSearch = useCallback(() => {
-    setSearchOpen(false);
-    setSearchQuery('');
-  }, []);
-
-  const goTo = (path) => { closeSearch(); navigate(path); };
+  }, [navigate]);
 
   /* hide on auth page — after ALL hooks */
   if (location.pathname === '/auth') return null;
@@ -167,7 +107,7 @@ export default function Navbar() {
           {/* Search button — mobile */}
           <motion.button
             whileTap={{ scale: 0.92 }}
-            onClick={() => setSearchOpen(true)}
+            onClick={() => navigate('/search')}
             aria-label="Search"
             className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2 cursor-pointer shadow-sm"
           >
@@ -268,7 +208,7 @@ export default function Navbar() {
 
           {/* Search bar — desktop */}
           <button
-            onClick={() => setSearchOpen(true)}
+            onClick={() => navigate('/search')}
             aria-label="Open search (Ctrl+K)"
             className="hidden lg:flex items-center gap-2.5 bg-white border border-slate-200 hover:border-orange-300 rounded-2xl px-4 py-2.5 w-[220px] cursor-pointer transition-all duration-200 group shadow-sm hover:shadow-md hover:shadow-orange-100/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
           >
@@ -337,206 +277,7 @@ export default function Navbar() {
         </div>
       </motion.nav>
 
-      {/* ═══════════════════════════════════════════
-          SEARCH OVERLAY
-      ═══════════════════════════════════════════ */}
-      <AnimatePresence>
-        {searchOpen && (
-          <>
-            {/* backdrop */}
-            <motion.div
-              key="overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeSearch}
-              className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
-            />
-            {/* panel */}
-            <motion.div
-              key="search-panel"
-              initial={{ opacity: 0, y: -16, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -12, scale: 0.97 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-              className="fixed top-4 left-1/2 -translate-x-1/2 z-[61] w-[92vw] max-w-xl"
-            >
-              {/* Input row */}
-              <div className="flex items-center gap-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/25 px-4 py-3.5 border border-slate-200/60">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shrink-0 shadow-md shadow-orange-400/30">
-                  <SearchIcon size={16} className="text-white" />
-                </div>
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search food, categories, restaurants…"
-                  className="flex-1 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none bg-transparent"
-                />
-                {searchQuery ? (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
-                ) : (
-                  <kbd className="text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200 rounded-lg px-1.5 py-1 shrink-0">Esc</kbd>
-                )}
-              </div>
 
-              {/* Results dropdown */}
-              <AnimatePresence>
-                {q && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.18 }}
-                    className="mt-2 bg-white rounded-2xl shadow-2xl shadow-black/15 border border-slate-100 overflow-hidden"
-                  >
-                    {!hasResults && (
-                      <div className="px-5 py-8 text-center flex flex-col items-center justify-center gap-3">
-                        <div className="space-y-1">
-                          <p className="text-slate-700 font-black text-sm">No results for "{searchQuery}"</p>
-                          <p className="text-slate-400 text-xs font-semibold max-w-[280px]">
-                            We couldn't find matches on our site, but we can still deliver it to you!
-                          </p>
-                        </div>
-                        <a
-                          href={`https://wa.me/917972081926?text=${encodeURIComponent(`Hello NextTo! I searched for "${searchQuery}" on your website but couldn't find it. Can I order this here?`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-2.5 px-4 rounded-xl text-xs shadow-md shadow-emerald-500/10 transition-colors cursor-pointer"
-                        >
-                          <MessageSquare size={13} /> Order "{searchQuery}" on WhatsApp
-                        </a>
-                      </div>
-                    )}
-
-                    {/* Category results */}
-                    {resultCategories.length > 0 && (
-                      <div>
-                        <p className="px-4 pt-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">Categories</p>
-                        {resultCategories.map((cat) => {
-                          const CAT_GRADIENT = {
-                            food: 'from-orange-400 to-amber-500',
-                            medicine: 'from-blue-400 to-cyan-500',
-                            grocery: 'from-emerald-400 to-teal-500',
-                          };
-                          return (
-                            <button
-                              key={cat.id}
-                              onClick={() => goTo(`/categories/${cat.id}`)}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 transition-colors cursor-pointer text-left"
-                            >
-                              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${CAT_GRADIENT[cat.serviceType] ?? 'from-slate-400 to-slate-500'} overflow-hidden shrink-0 flex items-center justify-center`}>
-                                {cat.image
-                                  ? <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
-                                  : <LayoutGrid size={16} className="text-white/80" />
-                                }
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-slate-800 text-sm truncate">{cat.name}</p>
-                                {cat.serviceType && (
-                                  <p className="text-slate-400 text-[10px] font-semibold capitalize">{cat.serviceType}</p>
-                                )}
-                              </div>
-                              <LayoutGrid size={12} className="text-slate-300 shrink-0" />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Product results */}
-                    {resultProducts.length > 0 && (
-                      <div className={resultCategories.length > 0 ? 'border-t border-slate-50' : ''}>
-                        <p className="px-4 pt-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">Items</p>
-                        {resultProducts.map((p) => (
-                          <button
-                            key={p.id}
-                            onClick={() => goTo(`/product/${p.id}`)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 transition-colors cursor-pointer text-left"
-                          >
-                            {p.images?.[0] ? (
-                              <img src={p.images[0]} alt={p.name}
-                                className={`w-10 h-10 rounded-xl object-cover shrink-0 ${p.isAvailable === false ? 'grayscale' : ''}`} />
-                            ) : (
-                              <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
-                                <Package size={16} className="text-orange-400" />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-slate-800 text-sm truncate flex items-center gap-1.5 flex-wrap">
-                                <span>{p.name}</span>
-                                {p.isAvailable === false && (
-                                  <span className="inline-block bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-black px-1.5 py-0.5 rounded-md">
-                                    Out of Stock
-                                  </span>
-                                )}
-                                {p.serviceType && p.isAvailable !== false && (
-                                  <span className={`inline-block border text-[9px] font-black px-1.5 py-0.5 rounded-md capitalize ${p.serviceType.toLowerCase() === 'food' ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                                      p.serviceType.toLowerCase() === 'grocery' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                        p.serviceType.toLowerCase() === 'medicine' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                          'bg-purple-50 text-purple-600 border-purple-100'
-                                    }`}>
-                                    in {p.serviceType}
-                                  </span>
-                                )}
-                              </p>
-                              <p className={`font-black text-xs ${p.isAvailable === false ? 'text-slate-400' : 'text-orange-500'}`}>
-                                ₹{p.discountPrice ?? p.price}
-                              </p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Restaurant results */}
-                    {resultRestaurants.length > 0 && (
-                      <div className={resultProducts.length > 0 ? 'border-t border-slate-50' : ''}>
-                        <p className="px-4 pt-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">Restaurants</p>
-                        {resultRestaurants.map((r) => (
-                          <button
-                            key={r.id}
-                            onClick={() => goTo(`/restaurant/${r.id}`)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 transition-colors cursor-pointer text-left"
-                          >
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-100 to-amber-50 overflow-hidden shrink-0">
-                              {r.banner
-                                ? <img src={r.banner} alt={r.name} className="w-full h-full object-cover" />
-                                : <div className="w-full h-full flex items-center justify-center"><UtensilsCrossed size={14} className="text-orange-300" /></div>
-                              }
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-slate-800 text-sm truncate">{r.name}</p>
-                              {r.address && (
-                                <p className="flex items-center gap-1 text-slate-400 text-xs truncate">
-                                  <MapPin size={9} /> {r.address}
-                                </p>
-                              )}
-                            </div>
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shrink-0 ${r.isOpen ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'
-                              }`}>
-                              {r.isOpen ? 'Open' : 'Closed'}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <p className="text-center text-[11px] text-white/70 mt-2">Press <kbd className="bg-white/20 rounded px-1">Esc</kbd> to close</p>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* ═══════════════════════════════════════════
           MOBILE / TABLET BOTTOM TAB BAR  (< md)

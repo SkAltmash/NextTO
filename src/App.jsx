@@ -16,6 +16,7 @@ import Restaurants from './pages/Restaurants';
 import Checkout from './pages/Checkout';
 import OrderDetail from './pages/OrderDetail';
 import Categories from './pages/Categories';
+import Search from './pages/Search';
 import CategoryDetail from './pages/CategoryDetail';
 import PrivacyPolicy from './pages/PolicyPrivacy';
 import TermsOfService from './pages/PolicyTerms';
@@ -81,6 +82,7 @@ function AppLayout() {
           <Route path="/restaurant/:id" element={<RestaurantDetail />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/order/:id" element={<OrderDetail />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/categories/:id" element={<CategoryDetail />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
