@@ -97,6 +97,8 @@ export default async function handler(req, res) {
       });
 
       const data = await response.json().catch(() => ({}));
+      console.log(`[api/notify] Raw response from https://api.onesignal.com/notifications for restaurant ${rId}:`, JSON.stringify(data, null, 2));
+
       const hasErrors = data.errors && data.errors.length > 0;
       const noRecipients = data.recipients === 0;
 
@@ -109,10 +111,16 @@ export default async function handler(req, res) {
           success: false,
           error: errorMsg,
           debugAuthHeader: authHeader ? `${authHeader.substring(0, 15)}...` : 'EMPTY',
-          details: data
+          onesignalRawResponse: data
         });
       } else {
-        results.push({ restaurantId: rId, success: true, notificationId: data.id, recipients: data.recipients });
+        results.push({
+          restaurantId: rId,
+          success: true,
+          notificationId: data.id,
+          recipients: data.recipients,
+          onesignalRawResponse: data
+        });
       }
     } catch (err) {
       results.push({ restaurantId: rId, success: false, error: err.message });
