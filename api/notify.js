@@ -85,7 +85,12 @@ export default async function handler(req, res) {
           ],
           data: { screen: 'orders' },
           priority: 10,
-          android_channel_id: undefined,
+
+          // 🔔 CUSTOM NOTIFICATION SOUND & CHANNEL FIXES
+          android_channel_id: 'orders_channel',
+          android_sound: 'new_order',
+          ios_sound: 'new_order.mp3',
+
           small_icon: 'ic_stat_onesignal_default',
           android_visibility: 1,
         }),
@@ -109,3 +114,4 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ results });
 }
+
