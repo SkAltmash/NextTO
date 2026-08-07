@@ -139,7 +139,16 @@ async function notifyRestaurantsDirect({ orderId, cart }) {
             filters: [
               { field: 'tag', key: 'restaurantId', relation: '=', value: rId }
             ],
-            data: { screen: 'orders' }
+            data: { screen: 'orders' },
+            priority: 10,
+
+            // 🔔 CUSTOM NOTIFICATION SOUND & CHANNEL FIXES
+            android_channel_id: 'edcff667-74cf-4691-b5f0-afcd81636cc6',
+            android_sound: 'new_order',
+            ios_sound: 'new_order.mp3',
+
+            small_icon: 'ic_stat_onesignal_default',
+            android_visibility: 1,
           }),
           keepalive: true,
         });
