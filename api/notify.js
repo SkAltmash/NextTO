@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getFirestore } from 'firebase/firestore';
 
 // Initialize Firebase using serverless environment variables or falls back to system process.env
 const firebaseConfig = {
@@ -93,6 +93,17 @@ export default async function handler(req, res) {
 
           small_icon: 'ic_stat_onesignal_default',
           android_visibility: 1,
+
+          // 🚀 FORCE IMMEDIATE DELIVERY — bypass Android Doze / background restrictions
+          // ttl=0 means discard if not delivered immediately (no queuing)
+          ttl: 300,
+          // content_available wakes the app on iOS even when in background
+          content_available: true,
+          // Ensures FCM sends as high-priority to wake the device
+          android_background_data: true,
+          // Collapse key — replaces any pending notification with same key so
+          // device isn't flooded when it wakes up
+          collapse_id: `new_order_${rId}`,
         }),
       });
 
