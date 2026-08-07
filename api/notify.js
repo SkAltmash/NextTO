@@ -87,7 +87,7 @@ export default async function handler(req, res) {
           priority: 10,
 
           // 🔔 CUSTOM NOTIFICATION SOUND & CHANNEL FIXES
-          android_channel_id: 'orders_channel',
+          android_channel_id: 'edcff667-74cf-4691-b5f0-afcd81636cc6',
           android_sound: 'new_order',
           ios_sound: 'new_order.mp3',
 
