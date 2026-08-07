@@ -96,22 +96,30 @@ export default async function handler(req, res) {
         }),
       });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        results.push({ 
-          restaurantId: rId, 
-          success: false, 
-          error: errText,
-          debugAuthHeader: authHeader ? `${authHeader.substring(0, 15)}...` : 'EMPTY'
+      const data = await response.json().catch(() => ({}));
+      const hasErrors = data.errors && data.errors.length > 0;
+      const noRecipients = data.recipients === 0;
+
+      if (!response.ok || hasErrors || noRecipients || !data.id) {
+        const errorMsg = hasErrors
+          ? data.errors.join(', ')
+          : (noRecipients ? 'No subscribed restaurant devices found' : `HTTP status ${response.status}`);
+        results.push({
+          restaurantId: rId,
+          success: false,
+          error: errorMsg,
+          debugAuthHeader: authHeader ? `${authHeader.substring(0, 15)}...` : 'EMPTY',
+          details: data
         });
       } else {
-        results.push({ restaurantId: rId, success: true });
+        results.push({ restaurantId: rId, success: true, notificationId: data.id, recipients: data.recipients });
       }
     } catch (err) {
       results.push({ restaurantId: rId, success: false, error: err.message });
     }
   }
 
-  return res.status(200).json({ results });
+  const allSuccessful = results.length > 0 && results.every((r) => r.success);
+  return res.status(allSuccessful ? 200 : 207).json({ success: allSuccessful, results });
 }
 

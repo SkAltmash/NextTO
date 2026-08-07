@@ -144,8 +144,14 @@ async function notifyRestaurantsDirect({ orderId, cart }) {
           keepalive: true,
         });
 
-        if (!response.ok) {
-          const errText = await response.text();
+        const data = await response.json().catch(() => ({}));
+        const hasErrors = data.errors && data.errors.length > 0;
+        const noRecipients = data.recipients === 0;
+
+        if (!response.ok || hasErrors || noRecipients || !data.id) {
+          const errText = hasErrors 
+            ? data.errors.join(', ') 
+            : (noRecipients ? 'No subscribed restaurant devices found' : `HTTP status ${response.status}`);
           console.warn(`[notify] OneSignal error for restaurant ${rId}:`, errText);
         } else {
           console.log(`[notify] OneSignal notification sent successfully to restaurant ${rId}`);
@@ -179,11 +185,13 @@ export async function notifyRestaurants({ orderId, cart }) {
       keepalive: true,
     });
 
-    if (response.status === 404 || !response.ok) {
-      console.warn(`[notify] API notification returned status ${response.status}. Falling back to direct client-side call...`);
+    const data = await response.json().catch(() => ({}));
+    const allSuccessful = data.success === true || (Array.isArray(data.results) && data.results.length > 0 && data.results.every((r) => r.success));
+
+    if (response.status === 404 || !response.ok || !allSuccessful) {
+      console.warn(`[notify] API notification returned status ${response.status} or partial failure. Falling back to direct client-side call... Data:`, data);
       await notifyRestaurantsDirect({ orderId, cart });
     } else {
-      const data = await response.json().catch(() => ({}));
       console.log('[notify] OneSignal push triggered successfully via serverless API route. Results:', data.results);
     }
   } catch (err) {
