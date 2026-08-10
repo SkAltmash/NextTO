@@ -322,6 +322,7 @@ export async function notifyPickupDropPartner({
   user,
   mobile,
 }) {
+  // Nothing to do if no partner was assigned
   if (!botToken || !pickupDropDetails?.assignedPartnerId) return;
 
   try {
@@ -331,6 +332,8 @@ export async function notifyPickupDropPartner({
     const partnerData = snap.data();
     const isOnline = partnerData.isOnline !== false;
     const payLabel = paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase();
+    // partnerEarning field was renamed to deliveryPartnerEarning
+    const earning = pickupDropDetails.deliveryPartnerEarning ?? pickupDropDetails.partnerEarning ?? 0;
 
     if (isOnline) {
       const chatId = partnerData.telegramChatId;
@@ -342,7 +345,7 @@ export async function notifyPickupDropPartner({
         `📍 From: ${escapeHtml(pickupDropDetails.pickupLocationName)}\n` +
         `📍 To: ${escapeHtml(pickupDropDetails.dropLocationName)}\n\n` +
         `<b>Total Charge: ₹${pickupDropDetails.totalCharge}</b>\n` +
-        `<b>Your Commission: ₹${pickupDropDetails.partnerEarning}</b>\n\n` +
+        `<b>Your Earning: ₹${earning}</b>\n\n` +
         `Payment: ${payLabel}\n` +
         `Address details: ${escapeHtml(address)}\n` +
         (pickupDropDetails.note ? `Note: ${escapeHtml(pickupDropDetails.note)}\n` : '') +
@@ -351,7 +354,8 @@ export async function notifyPickupDropPartner({
 
       await sendTelegramMessage(botToken, chatId, msg);
     } else {
-      // Partner offline → escalate to admin
+      // Partner is offline (shouldn't normally happen since we use atomic claims,
+      // but kept as a safety net) → escalate to admin.
       const adminChatId = await getAdminChatId();
       if (!adminChatId) return;
 
@@ -378,6 +382,48 @@ export async function notifyPickupDropPartner({
     }
   } catch (err) {
     console.warn('[notify] Pickup & Drop Telegram skipped:', err.message);
+  }
+}
+
+/**
+ * Sends a Telegram alert to admin when NO pickup & drop partner could be
+ * found (all partners are busy or offline at order time).
+ */
+async function notifyNoPickupDropPartnerAvailable({
+  botToken,
+  orderId,
+  pickupDropDetails,
+  totalCharge,
+  user,
+  mobile,
+  address,
+}) {
+  if (!botToken) return;
+
+  try {
+    const adminChatId = await getAdminChatId();
+    if (!adminChatId) return;
+
+    const onlineList = await getOnlinePartnersText();
+
+    const msg =
+      `🚨 <b>No Pickup & Drop Partner Available!</b>\n\n` +
+      `A Pickup & Drop order was placed but <b>no available partner</b> (online &amp; not busy) was found.\n\n` +
+      `<b>Order Details:</b>\n` +
+      `Order ID: <code>${escapeHtml(orderId)}</code>\n` +
+      `From: <b>${escapeHtml(pickupDropDetails?.pickupLocationName ?? '')}</b>\n` +
+      `To: <b>${escapeHtml(pickupDropDetails?.dropLocationName ?? '')}</b>\n` +
+      `Total Charge: ₹${totalCharge}\n` +
+      (pickupDropDetails?.note ? `Note: ${escapeHtml(pickupDropDetails.note)}\n` : '') +
+      `Customer: ${escapeHtml(user?.displayName ?? user?.email ?? '')}\n` +
+      `Mobile: ${escapeHtml(mobile)}\n` +
+      `Address: ${escapeHtml(address)}\n\n` +
+      `<b>Currently Online Partners:</b>\n${onlineList}\n\n` +
+      `Please assign a partner manually from the Admin app.`;
+
+    await sendTelegramMessage(botToken, adminChatId, msg);
+  } catch (err) {
+    console.warn('[notify] No-pickup-drop-partner admin alert skipped:', err.message);
   }
 }
 
@@ -454,9 +500,10 @@ export function dispatchOrderNotifications(params) {
     user,
     mobile,
     noPartnerAvailable,
+    noPickupDropPartnerAvailable,  // NEW: true when no partner found for pickup & drop
   } = params;
 
-  // 1️⃣ OneSignal Push notifications for restaurants (replacing Telegram restaurant notifications)
+  // 1️⃣ OneSignal Push notifications for restaurants
   if (cart && cart.length > 0) {
     notifyRestaurants({ orderId, cart }).catch(() => { });
   }
@@ -467,14 +514,27 @@ export function dispatchOrderNotifications(params) {
     return;
   }
 
-  // 2️⃣  Pickup & Drop partner
-  if (pickupDropDetails) {
+  // 2️⃣  Pickup & Drop partner notification (only if a partner was assigned)
+  if (pickupDropDetails && pickupDropDetails.assignedPartnerId) {
     notifyPickupDropPartner({
       botToken, orderId, pickupDropDetails, paymentMethod, address, user, mobile,
     }).catch(() => { });
   }
 
-  // 3️⃣  Regular delivery partner (skip if this is a pickup-drop-only order)
+  // 3️⃣  No Pickup & Drop partner available — alert admin for manual assignment
+  if (noPickupDropPartnerAvailable && pickupDropDetails) {
+    notifyNoPickupDropPartnerAvailable({
+      botToken,
+      orderId,
+      pickupDropDetails,
+      totalCharge: pickupDropDetails.totalCharge,
+      user,
+      mobile,
+      address,
+    }).catch(() => { });
+  }
+
+  // 4️⃣  Regular delivery partner (skip if this is a pickup-drop-only order)
   if (cart.length > 0 && !pickupDropOnly && deliveryPartnerId) {
     notifyDeliveryPartner({
       botToken,
@@ -491,7 +551,7 @@ export function dispatchOrderNotifications(params) {
     }).catch(() => { });
   }
 
-  // 4️⃣  No partner available — alert admin for manual assignment
+  // 5️⃣  No food-order partner available — alert admin for manual assignment
   if (noPartnerAvailable && !pickupDropOnly) {
     notifyNoPartnerAvailable({
       botToken, orderId, selectedLocName, totalPrice, deliveryCharge, user, mobile,

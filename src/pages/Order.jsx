@@ -31,11 +31,16 @@ const COLOR_MAP = {
   red: { badge: 'bg-red-50 text-red-500 border-red-100', bar: 'bg-red-400' },
 };
 
+// Status steps for pickup-drop orders (no "Preparing" step)
+const PICKUP_DROP_STATUSES = ['pending', 'confirmed', 'out', 'delivered'];
+
 // ─── Mini Progress Bar ─────────────────────────────────────────────────────────
-function StatusBar({ status }) {
+function StatusBar({ status, isPickupDrop }) {
   if (status === 'cancelled') return null;
-  const idx = STATUSES.indexOf(status);
-  const pct = idx < 0 ? 0 : Math.round(((idx + 1) / STATUSES.length) * 100);
+  // Use the correct step list so the bar fills proportionally
+  const steps = isPickupDrop ? PICKUP_DROP_STATUSES : STATUSES;
+  const idx = steps.indexOf(status);
+  const pct = idx < 0 ? 0 : Math.round(((idx + 1) / steps.length) * 100);
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const barColor = COLOR_MAP[cfg.color]?.bar ?? 'bg-orange-500';
 
@@ -108,14 +113,14 @@ function OrderCard({ order }) {
         </div>
         <div className="flex items-center gap-1.5">
           <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${colors.badge}`}>
-            {cfg.label}
+            {order.isPickupDropOrder && order.status === 'out' ? 'Out for Pickup' : cfg.label}
           </span>
           <ChevronRight size={15} className="text-slate-300" />
         </div>
       </div>
 
       {/* Progress bar */}
-      <StatusBar status={order.status} />
+      <StatusBar status={order.status} isPickupDrop={!!order.isPickupDropOrder} />
 
       {/* Item thumbnails */}
       {preview.length > 0 && (

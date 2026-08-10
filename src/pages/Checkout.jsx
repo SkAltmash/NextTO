@@ -193,24 +193,78 @@ function LocationDropdown({ locations, selected, onSelect, disabled }) {
                       </button>
                     );
                   })
-                ) : (
-                  <div className="py-12 px-4 text-center">
-                    <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-400 flex items-center justify-center mx-auto mb-3">
-                      <Search size={22} />
-                    </div>
-                    <p className="font-bold text-slate-800 text-sm">No delivery areas found</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      No location matches "{searchQuery}". Try searching with a different keyword.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="mt-3 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-4 py-2 rounded-xl transition-colors cursor-pointer"
-                    >
-                      Clear Search
-                    </button>
-                  </div>
-                )}
+                ) : (() => {
+                    // When search returns nothing, offer the "Other" area as a fallback
+                    // so users whose area isn't listed can still proceed.
+                    const OTHER_ID = 'VNQRg6tm55nOe4PFepfg';
+                    const otherLoc = locations.find((l) => l.id === OTHER_ID);
+                    const isSelected = selected?.id === OTHER_ID;
+
+                    return otherLoc ? (
+                      <div>
+                        <p className="text-center text-[11px] font-bold text-slate-400 uppercase tracking-wide py-3 px-4">
+                          No exact match — try selecting "Other"
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleSelect(otherLoc)}
+                          className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-orange-50/90 border-2 border-orange-500 shadow-xs'
+                              : 'bg-white hover:bg-slate-50 border border-slate-150 hover:border-orange-200 shadow-2xs'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                isSelected ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-400'
+                              }`}
+                            >
+                              {isSelected ? <CheckCircle2 size={18} /> : <MapPin size={18} />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className={`text-sm font-bold truncate ${isSelected ? 'text-orange-950' : 'text-slate-800'}`}>
+                                {otherLoc.name}
+                              </p>
+                              <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                                Your area isn't listed? Pick this option
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <span className="ml-2 px-2.5 py-1 rounded-lg bg-orange-500 text-white text-xs font-black shrink-0">
+                              Selected
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery('')}
+                          className="w-full mt-2 text-xs font-bold text-slate-400 hover:text-slate-600 py-2 rounded-xl transition-colors cursor-pointer"
+                        >
+                          ← Back to all areas
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="py-12 px-4 text-center">
+                        <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-400 flex items-center justify-center mx-auto mb-3">
+                          <Search size={22} />
+                        </div>
+                        <p className="font-bold text-slate-800 text-sm">No delivery areas found</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          No location matches "{searchQuery}". Try searching with a different keyword.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery('')}
+                          className="mt-3 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-4 py-2 rounded-xl transition-colors cursor-pointer"
+                        >
+                          Clear Search
+                        </button>
+                      </div>
+                    );
+                  })()
+}
               </div>
             </motion.div>
           </div>

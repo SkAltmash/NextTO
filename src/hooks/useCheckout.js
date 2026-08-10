@@ -312,7 +312,10 @@ export function useCheckout() {
   const isPickupDropOrder = !!pickupOrderData;
   const needsDeliveryArea = cart.length > 0;
 
-  const pickupDropCharge = numberValue(pickupOrderData?.totalCharge);
+  // pickupOrderData.totalCharge = raw (Area A + Area B) as stored by the pickup flow.
+  // Customer pays 70% of that, so apply the same factor here for UI display + totalAmount.
+  const rawPickupDropCharge = numberValue(pickupOrderData?.totalCharge);
+  const pickupDropCharge = rawPickupDropCharge > 0 ? Math.round(rawPickupDropCharge * 0.7) : 0;
   const deliveryCharge = numberValue(selectedLoc?.deliveryCharge);
 
   const couponCartDiscount = couponResult?.cartDiscount ?? 0;
@@ -471,24 +474,39 @@ export function useCheckout() {
           fetchDeliveryLocation(pickupOrderData.dropLoc),
         ]);
 
-        const pickupDropPartner = await fetchPartner(pickupLoc.assignedPartnerId);
-        const pickupCommission = numberValue(pickupDropPartner?.commissionFlat);
+        // Raw area charges from location docs (fall back to what was stored in pickupOrderData)
         const pickupCharge = numberValue(pickupLoc.deliveryCharge ?? pickupOrderData.pickupCharge);
-        const dropCharge = numberValue(dropLoc.deliveryCharge ?? pickupOrderData.dropCharge);
+        const dropCharge   = numberValue(dropLoc.deliveryCharge   ?? pickupOrderData.dropCharge);
+        const rawTotal     = pickupCharge + dropCharge;          // Area A + Area B
+        const totalCharge  = Math.round(rawTotal * 0.7);         // 70% → what customer pays
 
+        // Atomically claim a partner: try the pickup area's assigned partners first
+        // (area-priority), then fall back to any globally available partner.
+        // Uses a Firestore transaction so isBusy is set atomically (no race conditions).
+        const pdPartnerResult = await assignDeliveryPartner(pickupLoc);
+        const pdPartnerId     = pdPartnerResult?.id   ?? '';
+        const pdPartnerName   = pdPartnerResult?.name ?? (pickupLoc.assignedPartnerName ?? '');
+
+        // deliveryPartnerEarning is finalised in Step 8 once rain/distance fees are known.
+        // We store rawTotal so Step 8 can use it without re-computing.
         pickupDropDetails = {
-          pickupLocationId: pickupLoc.id ?? '',
+          pickupLocationId:   pickupLoc.id   ?? '',
           pickupLocationName: pickupLoc.name ?? '',
           pickupCharge,
 
-          dropLocationId: dropLoc.id ?? '',
+          dropLocationId:   dropLoc.id   ?? '',
           dropLocationName: dropLoc.name ?? '',
           dropCharge,
 
-          assignedPartnerId: pickupLoc.assignedPartnerId ?? '',
-          assignedPartnerName: pickupDropPartner?.name ?? pickupLoc.assignedPartnerName ?? '',
-          partnerEarning: pickupCommission,
-          totalCharge: pickupCharge + dropCharge,
+          rawTotal,     // Area A + Area B (for earning calculation in Step 8)
+          totalCharge,  // 70% of rawTotal — what customer pays, shown in UI
+
+          assignedPartnerId:   pdPartnerId,
+          assignedPartnerName: pdPartnerName,
+
+          // Filled in Step 8 after rain/distance fees are known
+          deliveryPartnerEarning: 0,
+
           note: pickupOrderData.note ?? '',
         };
       }
@@ -571,7 +589,6 @@ export function useCheckout() {
       ];
 
       // ── Step 8: Compute final totals ─────────────────────────────────────────
-      const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
 
       // Free delivery: only food-only carts with subtotal >= ₹500
       const orderHasNonFoodItem = cart.some(
@@ -592,21 +609,36 @@ export function useCheckout() {
       const restDocData = restaurantDataMap[firstRestId];
       const finalDistanceServiceFee = numberValue(restDocData?.distanceServiceFee ?? distanceServiceFee);
 
-      // ── Delivery partner earning: NEW formula ─────────────────────────────────
-      // 70% of raw area delivery charge (always, even when free delivery is applied)
-      // + 50% of rain surcharge + 50% of distance service fee
-      // Always stored regardless of whether a partner is found or online.
-      // NOTE: When free delivery is granted, the store absorbs the partner cost —
-      //       so we use `deliveryCharge` (raw) NOT `orderDeliveryCharge` (effective).
-      const rawAreaCharge = needsDeliveryArea ? deliveryCharge : 0;
-      const areaFeePartnerShare = Math.round(rawAreaCharge * 0.7);
-      const rainPartnerBonus = Math.round(finalRainSurcharge * 0.5);
+      // ── Shared partner bonus components ───────────────────────────────────────
+      const rainPartnerBonus               = Math.round(finalRainSurcharge * 0.5);
       const distanceServiceFeePartnerBonus = Math.round(finalDistanceServiceFee * 0.5);
+
+      // ── Food/regular delivery partner earning ─────────────────────────────────
+      // 70% of raw area charge (always, even when free delivery is applied to customer)
+      // + 50% of rain surcharge + 50% of distance service fee
+      // Always stored regardless of whether a partner was found.
+      const rawAreaCharge       = needsDeliveryArea ? deliveryCharge : 0;
+      const areaFeePartnerShare = Math.round(rawAreaCharge * 0.7);
       const finalDeliveryPartnerEarning =
         areaFeePartnerShare + rainPartnerBonus + distanceServiceFeePartnerBonus;
 
+      // ── Pickup & Drop partner earning ─────────────────────────────────────────
+      // 70% of (Area A + Area B raw) + 50% of rain + 50% of distance fee
+      // Always stored even if no partner was found (order still saves).
+      if (pickupDropDetails) {
+        const pdEarning =
+          Math.round(pickupDropDetails.totalCharge * 0.7) + // 70% of totalCharge = 70%(70%(A+B))
+          rainPartnerBonus +                              // 50% of rain surcharge
+          distanceServiceFeePartnerBonus;                 // 50% of distance fee
+        pickupDropDetails = { ...pickupDropDetails, deliveryPartnerEarning: pdEarning };
+      }
+
+      // Subtotal: cart items + pickup-drop totalCharge (already the 70% value)
+      const subtotal = totalPrice + (pickupDropDetails?.totalCharge ?? 0);
+
       const finalTotalAmount =
-        subtotal + orderDeliveryCharge + finalRainSurcharge + finalDistanceServiceFee - finalCouponCartDiscount - finalCouponDeliveryDiscount;
+        subtotal + orderDeliveryCharge + finalRainSurcharge + finalDistanceServiceFee
+        - finalCouponCartDiscount - finalCouponDeliveryDiscount;
 
       // ── Step 9: Save the order to Firestore ───────────────────────────────────
       const orderRef = await addDoc(collection(db, 'orders'), {
@@ -634,7 +666,8 @@ export function useCheckout() {
         pickupDrop: pickupDropDetails,
         pickupDropPartnerId: pickupDropDetails?.assignedPartnerId ?? '',
         pickupDropPartnerName: pickupDropDetails?.assignedPartnerName ?? '',
-        pickupDropPartnerEarning: pickupDropDetails?.partnerEarning ?? 0,
+        // deliveryPartnerEarning is always set (70% of raw + 50% bonuses) even if no partner found
+        pickupDropPartnerEarning: pickupDropDetails?.deliveryPartnerEarning ?? 0,
 
         // Delivery
         address: address.trim(),
@@ -647,9 +680,13 @@ export function useCheckout() {
         deliveryPartnerId,
         deliveryPartnerName,
         deliveryPartnerNumber,
-        deliveryPartnerEarning: finalDeliveryPartnerEarning,
+        // For pickup-drop orders: earning comes from pickupDropDetails (set in Step 8)
+        // For food orders: earning = 70% area + 50% rain + 50% distance (always stored)
+        deliveryPartnerEarning: pickupDropOnly
+          ? (pickupDropDetails?.deliveryPartnerEarning ?? 0)
+          : finalDeliveryPartnerEarning,
         // Earning breakdown (for admin/settlement reference)
-        areaFeePartnerShare,           // 70% of orderDeliveryCharge
+        areaFeePartnerShare: pickupDropOnly ? 0 : areaFeePartnerShare, // 70% of raw delivery charge
 
         // Coupon
         appliedCouponId: finalCouponId,
@@ -701,7 +738,10 @@ export function useCheckout() {
               address: cleanAddr,
               mobile: cleanMob,
               phone: cleanMob,
-              lastLocationId: locIdToSave,
+              // Only update lastLocationId when we actually have one;
+              // pickup-drop orders have no selectedLoc so we must not overwrite
+              // the user's previously saved food-delivery location.
+              ...(locIdToSave ? { lastLocationId: locIdToSave } : {}),
               updatedAt: serverTimestamp(),
             },
             { merge: true }
@@ -737,7 +777,10 @@ export function useCheckout() {
         address: address.trim(),
         user,
         mobile: mobile.trim(),
+        // Food-order: no partner found
         noPartnerAvailable: !deliveryPartnerId && !pickupDropOnly,
+        // Pickup & Drop: no partner found (order still saved, admin must assign manually)
+        noPickupDropPartnerAvailable: pickupDropOnly && !pickupDropDetails?.assignedPartnerId,
       });
 
     } catch (err) {
@@ -774,7 +817,8 @@ export function useCheckout() {
           address: cleanAddr,
           mobile: cleanMob,
           phone: cleanMob,
-          lastLocationId: locIdToSave,
+          // Same guard: only write lastLocationId when non-empty
+          ...(locIdToSave ? { lastLocationId: locIdToSave } : {}),
           updatedAt: serverTimestamp(),
         },
         { merge: true }

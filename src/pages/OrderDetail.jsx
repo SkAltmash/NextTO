@@ -12,12 +12,21 @@ import {
 } from 'lucide-react';
 
 // ─── Status Config ─────────────────────────────────────────────────────────────
+// Status steps for regular food/grocery/medicine orders
 const STEPS = [
-  { key: 'pending', label: 'Order Placed', icon: ClipboardList, desc: 'We received your order' },
-  { key: 'confirmed', label: 'Confirmed', icon: CheckCircle2, desc: 'Restaurant accepted your order' },
-  { key: 'preparing', label: 'Preparing', icon: ChefHat, desc: 'Your food is being prepared' },
-  { key: 'out', label: 'Out for Delivery', icon: Bike, desc: 'On the way to you!' },
-  { key: 'delivered', label: 'Delivered', icon: CheckCircle2, desc: 'Enjoy your meal!' },
+  { key: 'pending',   label: 'Order Placed',    icon: ClipboardList, desc: 'We received your order' },
+  { key: 'confirmed', label: 'Confirmed',        icon: CheckCircle2,  desc: 'Order confirmed' },
+  { key: 'preparing', label: 'Preparing',        icon: ChefHat,       desc: 'Your food is being prepared' },
+  { key: 'out',       label: 'Out for Delivery', icon: Bike,          desc: 'On the way to you!' },
+  { key: 'delivered', label: 'Delivered',        icon: CheckCircle2,  desc: 'Enjoy your meal!' },
+];
+
+// Status steps for Pickup & Drop orders — no "Preparing" stage
+const PICKUP_DROP_STEPS = [
+  { key: 'pending',   label: 'Order Placed',    icon: ClipboardList, desc: 'We received your request' },
+  { key: 'confirmed', label: 'Confirmed',        icon: CheckCircle2,  desc: 'Pickup & Drop confirmed' },
+  { key: 'out',       label: 'Out for Pickup',   icon: Bike,          desc: 'Partner is on the way!' },
+  { key: 'delivered', label: 'Delivered',        icon: CheckCircle2,  desc: 'Package delivered!' },
 ];
 
 const STATUS_COLOR = {
@@ -139,7 +148,10 @@ function DeliveryPartnerCard({ partnerId }) {
 }
 
 // ─── Step Tracker ──────────────────────────────────────────────────────────────
-function StepTracker({ status }) {
+function StepTracker({ status, isPickupDrop }) {
+  // Pick the correct step list based on order type
+  const steps = isPickupDrop ? PICKUP_DROP_STEPS : STEPS;
+
   if (status === 'cancelled') {
     return (
       <div className="flex flex-col items-center gap-3 py-4">
@@ -154,16 +166,16 @@ function StepTracker({ status }) {
     );
   }
 
-  const currentIdx = STEPS.findIndex((s) => s.key === status);
+  const currentIdx = steps.findIndex((s) => s.key === status);
 
   return (
     <div className="space-y-0">
-      {STEPS.map((step, i) => {
+      {steps.map((step, i) => {
         const done = i < currentIdx;
         const active = i === currentIdx;
         const pending = i > currentIdx;
         const Icon = step.icon;
-        const isLast = i === STEPS.length - 1;
+        const isLast = i === steps.length - 1;
 
         return (
           <div key={step.key} className="flex gap-4">
@@ -339,7 +351,10 @@ export default function OrderDetail() {
           </button>
         </div>
         <span className={`text-[10px] font-black px-3 py-1.5 rounded-full border ${cfg.badge}`}>
-          {STEPS.find(s => s.key === order?.status)?.label ?? order?.status}
+          {(() => {
+            const steps = order?.isPickupDropOrder ? PICKUP_DROP_STEPS : STEPS;
+            return steps.find(s => s.key === order?.status)?.label ?? order?.status;
+          })()}
         </span>
       </div>
 
@@ -355,7 +370,7 @@ export default function OrderDetail() {
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <h2 className="font-black text-slate-900 text-sm">Live Order Status</h2>
           </div>
-          <StepTracker status={order?.status} />
+          <StepTracker status={order?.status} isPickupDrop={!!order?.isPickupDropOrder} />
         </motion.div>
 
         {/* ── Delivery Partner Card ── */}

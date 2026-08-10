@@ -82,7 +82,41 @@ function LocationSelect({ label, icon: Icon, locations, value, onChange, exclude
               )}
               <div className="max-h-48 overflow-y-auto">
                 {filtered.length === 0
-                  ? <p className="px-4 py-3 text-xs text-slate-400 font-semibold">No matching areas</p>
+                  ? (() => {
+                      const OTHER_ID = 'VNQRg6tm55nOe4PFepfg';
+                      // Respect the exclude prop so "Other" can't be both pickup and drop
+                      const otherLoc = locations.find(
+                        (l) => l.id === OTHER_ID && l.id !== exclude?.id
+                      );
+                      return otherLoc ? (
+                        <div>
+                          <p className="px-4 pt-2 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wide">
+                            No match — try "Other"
+                          </p>
+                          <button
+                            key={otherLoc.id}
+                            type="button"
+                            onClick={() => { onChange(otherLoc); setOpen(false); setSearch(''); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-purple-50 transition-colors cursor-pointer border-b border-slate-50 last:border-0"
+                          >
+                            <MapPin size={12} className="text-purple-400 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-bold text-slate-800">{otherLoc.name}</span>
+                              <p className="text-[10px] text-slate-400 font-semibold">Area not listed? Pick this</p>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSearch('')}
+                            className="w-full text-[10px] font-bold text-slate-400 hover:text-purple-500 py-2 transition-colors cursor-pointer"
+                          >
+                            ← Show all areas
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="px-4 py-3 text-xs text-slate-400 font-semibold">No matching areas</p>
+                      );
+                    })()
                   : filtered.map((loc) => (
                     <button key={loc.id} type="button" onClick={() => { onChange(loc); setOpen(false); setSearch(''); }}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-purple-50 transition-colors cursor-pointer border-b border-slate-50 last:border-0">
@@ -91,6 +125,7 @@ function LocationSelect({ label, icon: Icon, locations, value, onChange, exclude
                     </button>
                   ))
                 }
+
               </div>
             </div>
           </>
@@ -123,7 +158,8 @@ function PickupDropForm() {
 
   const pickupCharge = Number(pickupLoc?.deliveryCharge ?? 0);
   const dropCharge = Number(dropLoc?.deliveryCharge ?? 0);
-  const totalCharge = pickupCharge + dropCharge;
+  const rawTotal = pickupCharge + dropCharge;               // Area A + Area B
+  const totalCharge = rawTotal > 0 ? Math.round(rawTotal * 0.7) : 0; // 70% — what customer pays
   const sameLocation = pickupLoc && dropLoc && pickupLoc.id === dropLoc.id;
   const canAdd = isOnline && pickupLoc && dropLoc && !sameLocation && !hasDeliveryItems;
 
@@ -156,7 +192,7 @@ function PickupDropForm() {
       dropLoc: buildLocationPayload(dropLoc),
       pickupCharge,
       dropCharge,
-      totalCharge,
+      totalCharge: rawTotal,  // store RAW so checkout can derive 70% correctly
       note: note.trim(),
     });
     toast.success('Pickup & Drop added to cart!');
@@ -188,7 +224,7 @@ function PickupDropForm() {
             </div>
             <div className="flex justify-between pt-2 border-t border-purple-200 mt-2">
               <span className="text-xs font-black text-purple-600 uppercase tracking-wide">Total Charge</span>
-              <span className="font-black text-purple-800">&#x20b9;{pickupOrderData.totalCharge}</span>
+              <span className="font-black text-purple-800">&#x20b9;{Math.round(Number(pickupOrderData.totalCharge ?? 0) * 0.7)}</span>
             </div>
           </div>
           <button onClick={() => setPickupOrderData(null)}
@@ -209,7 +245,7 @@ function PickupDropForm() {
           <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0"><Bike size={24} /></div>
           <div>
             <h2 className="text-lg font-black">Pickup &amp; Drop</h2>
-            <p className="text-purple-200 text-xs font-semibold">Select areas &middot; charge = pickup fee + drop fee</p>
+            <p className="text-purple-200 text-xs font-semibold">Select areas &middot; you pay 70% of (pickup + drop) fee</p>
           </div>
         </div>
       </div>

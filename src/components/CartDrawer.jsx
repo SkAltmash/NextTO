@@ -16,7 +16,9 @@ export default function CartDrawer({ open, onClose }) {
 
   const hasPickup = !!pickupOrderData;
   const hasAnything = cart.length > 0 || hasPickup;
-  const pickupTotal = Number(pickupOrderData?.totalCharge ?? 0);
+  // totalCharge stored in pickupOrderData is the RAW sum (Area A + Area B).
+  // Customer pays 70% of that — apply the same factor here for display.
+  const pickupTotal = Math.round(Number(pickupOrderData?.totalCharge ?? 0) * 0.7);
   const payableTotal = totalPrice + pickupTotal;
 
   const handleCheckout = () => {
