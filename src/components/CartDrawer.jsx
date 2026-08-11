@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, ShoppingCart, Trash2, Plus, Minus, ArrowRight, Package,
-  FileImage, Pill, Bike, Navigation, MapPin, PauseCircle
+  FileImage, Pill, Bike, Navigation, MapPin, PauseCircle, Sparkles, Gift
 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import CompleteYourMeal from './CompleteYourMeal';
@@ -14,12 +17,35 @@ export default function CartDrawer({ open, onClose }) {
   } = useCart();
   const navigate = useNavigate();
 
+  const [freeDeliveryMinOrder, setFreeDeliveryMinOrder] = useState(Infinity);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'freeDelivery'));
+        if (!cancelled) {
+          const val = snap.exists() ? Number(snap.data().minOrderValue ?? 500) : 500;
+          setFreeDeliveryMinOrder(isNaN(val) ? 500 : val);
+        }
+      } catch (err) {
+        if (!cancelled) setFreeDeliveryMinOrder(500);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const hasPickup = !!pickupOrderData;
   const hasAnything = cart.length > 0 || hasPickup;
+  const hasNonFood = cart.some(i => i.serviceType === 'grocery' || i.serviceType === 'medicine');
+  const showFreeDeliveryBanner = cart.length > 0 && !hasPickup && !hasNonFood && isFinite(freeDeliveryMinOrder);
+
   // totalCharge stored in pickupOrderData is the RAW sum (Area A + Area B).
   // Customer pays 70% of that — apply the same factor here for display.
   const pickupTotal = Math.round(Number(pickupOrderData?.totalCharge ?? 0) * 0.7);
   const payableTotal = totalPrice + pickupTotal;
+
+  const remainingForFreeDelivery = Math.max(0, freeDeliveryMinOrder - totalPrice);
+  const freeDeliveryProgress = Math.min(100, Math.round((totalPrice / (freeDeliveryMinOrder || 1)) * 100));
 
   const handleCheckout = () => {
     onClose();
@@ -102,6 +128,70 @@ export default function CartDrawer({ open, onClose }) {
                 </div>
               ) : (
                 <AnimatePresence>
+                  {/* ── Free Delivery Progress Banner ── */}
+                  {showFreeDeliveryBanner && (
+                    <motion.div
+                      key="free-delivery-banner"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className={`p-3.5 rounded-2xl border transition-all ${
+                        remainingForFreeDelivery === 0
+                          ? 'bg-gradient-to-r from-emerald-900 to-emerald-800 border-emerald-700 text-white shadow-md'
+                          : 'bg-gradient-to-r from-amber-50 to-orange-50 border-orange-200 text-slate-800'
+                      }`}
+                    >
+                      {remainingForFreeDelivery === 0 ? (
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
+                            <Gift size={20} className="text-emerald-400 animate-bounce" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black text-xs text-emerald-300 flex items-center gap-1">
+                              <span>🎉</span> FREE Delivery Unlocked!
+                            </p>
+                            <p className="text-[11px] text-emerald-100/90 font-medium truncate mt-0.5">
+                              You saved delivery charges on this order
+                            </p>
+                          </div>
+                          <span className="px-2 py-1 bg-emerald-400 text-emerald-950 rounded-lg text-[10px] font-black tracking-wide">
+                            FREE
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-200 flex items-center justify-center text-orange-500 shrink-0">
+                                <Bike size={14} />
+                              </div>
+                              <div>
+                                <p className="font-black text-xs text-orange-950">
+                                  Add <span className="text-orange-600">₹{remainingForFreeDelivery}</span> more for FREE delivery!
+                                </p>
+                                <p className="text-[10px] font-semibold text-slate-500">
+                                  ₹{totalPrice} of ₹{freeDeliveryMinOrder} spent
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-black text-orange-600 bg-orange-100 px-2 py-0.5 rounded-md border border-orange-200">
+                              {freeDeliveryProgress}%
+                            </span>
+                          </div>
+
+                          {/* Progress Bar Track */}
+                          <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${freeDeliveryProgress}%` }}
+                              transition={{ duration: 0.5, ease: 'easeOut' }}
+                              className="bg-gradient-to-r from-orange-400 to-amber-500 h-full rounded-full"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
                   {/* ── Prescription card ── */}
                   {hasPickup && (
                     <motion.div

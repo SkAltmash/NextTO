@@ -98,8 +98,8 @@ async function assignDeliveryPartner(selectedLocation) {
   const areaPartnerIds = selectedLocation.assignedPartnerIds?.length
     ? selectedLocation.assignedPartnerIds
     : selectedLocation.assignedPartnerId
-    ? [selectedLocation.assignedPartnerId]
-    : [];
+      ? [selectedLocation.assignedPartnerId]
+      : [];
 
   // ── Phase 1: Area partners (highest priority) ──
   for (const partnerId of areaPartnerIds) {
@@ -284,6 +284,25 @@ export function useCheckout() {
     return () => { cancelled = true; };
   }, []);
 
+  // ─── Fetch freeDeliveryMinOrder setting ──────────────────────────────────────
+  const [freeDeliveryMinOrder, setFreeDeliveryMinOrder] = useState(Infinity);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'freeDelivery'));
+        if (!cancelled) {
+          const val = snap.exists() ? Number(snap.data().minOrderValue ?? 500) : 500;
+          setFreeDeliveryMinOrder(isNaN(val) ? 500 : val);
+        }
+      } catch (err) {
+        console.warn('[useCheckout] fetchFreeDelivery:', err);
+        if (!cancelled) setFreeDeliveryMinOrder(500);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // ─── Fetch distanceServiceFee from restaurant doc ────────────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -327,15 +346,14 @@ export function useCheckout() {
 
   // distanceServiceFee is fetched from restaurants/{restaurantId}.distanceServiceFee (state above)
 
-  // Free delivery: only for food-only orders >= ₹500 (not grocery / medicine)
-  const FREE_DELIVERY_THRESHOLD = 500;
+  // Free delivery: only for food-only orders >= freeDeliveryMinOrder (not grocery / medicine)
   const hasNonFoodItem = cart.some(
     (i) => i.serviceType === 'grocery' || i.serviceType === 'medicine',
   );
   const freeDelivery =
     !isPickupDropOrder &&
     !hasNonFoodItem &&
-    totalPrice >= FREE_DELIVERY_THRESHOLD &&
+    totalPrice >= freeDeliveryMinOrder &&
     deliveryCharge > 0;
 
   const effectiveDeliveryCharge = freeDelivery ? 0 : deliveryCharge;
@@ -476,32 +494,32 @@ export function useCheckout() {
 
         // Raw area charges from location docs (fall back to what was stored in pickupOrderData)
         const pickupCharge = numberValue(pickupLoc.deliveryCharge ?? pickupOrderData.pickupCharge);
-        const dropCharge   = numberValue(dropLoc.deliveryCharge   ?? pickupOrderData.dropCharge);
-        const rawTotal     = pickupCharge + dropCharge;          // Area A + Area B
-        const totalCharge  = Math.round(rawTotal * 0.7);         // 70% → what customer pays
+        const dropCharge = numberValue(dropLoc.deliveryCharge ?? pickupOrderData.dropCharge);
+        const rawTotal = pickupCharge + dropCharge;          // Area A + Area B
+        const totalCharge = Math.round(rawTotal * 0.7);         // 70% → what customer pays
 
         // Atomically claim a partner: try the pickup area's assigned partners first
         // (area-priority), then fall back to any globally available partner.
         // Uses a Firestore transaction so isBusy is set atomically (no race conditions).
         const pdPartnerResult = await assignDeliveryPartner(pickupLoc);
-        const pdPartnerId     = pdPartnerResult?.id   ?? '';
-        const pdPartnerName   = pdPartnerResult?.name ?? (pickupLoc.assignedPartnerName ?? '');
+        const pdPartnerId = pdPartnerResult?.id ?? '';
+        const pdPartnerName = pdPartnerResult?.name ?? (pickupLoc.assignedPartnerName ?? '');
 
         // deliveryPartnerEarning is finalised in Step 8 once rain/distance fees are known.
         // We store rawTotal so Step 8 can use it without re-computing.
         pickupDropDetails = {
-          pickupLocationId:   pickupLoc.id   ?? '',
+          pickupLocationId: pickupLoc.id ?? '',
           pickupLocationName: pickupLoc.name ?? '',
           pickupCharge,
 
-          dropLocationId:   dropLoc.id   ?? '',
+          dropLocationId: dropLoc.id ?? '',
           dropLocationName: dropLoc.name ?? '',
           dropCharge,
 
           rawTotal,     // Area A + Area B (for earning calculation in Step 8)
           totalCharge,  // 70% of rawTotal — what customer pays, shown in UI
 
-          assignedPartnerId:   pdPartnerId,
+          assignedPartnerId: pdPartnerId,
           assignedPartnerName: pdPartnerName,
 
           // Filled in Step 8 after rain/distance fees are known
@@ -590,14 +608,14 @@ export function useCheckout() {
 
       // ── Step 8: Compute final totals ─────────────────────────────────────────
 
-      // Free delivery: only food-only carts with subtotal >= ₹500
+      // Free delivery: only food-only carts with subtotal >= freeDeliveryMinOrder
       const orderHasNonFoodItem = cart.some(
         (i) => i.serviceType === 'grocery' || i.serviceType === 'medicine',
       );
       const orderFreeDelivery =
         !pickupDropDetails &&
         !orderHasNonFoodItem &&
-        totalPrice >= FREE_DELIVERY_THRESHOLD &&
+        totalPrice >= freeDeliveryMinOrder &&
         deliveryCharge > 0;
       const orderDeliveryCharge = needsDeliveryArea
         ? (orderFreeDelivery ? 0 : deliveryCharge)
@@ -610,14 +628,14 @@ export function useCheckout() {
       const finalDistanceServiceFee = numberValue(restDocData?.distanceServiceFee ?? distanceServiceFee);
 
       // ── Shared partner bonus components ───────────────────────────────────────
-      const rainPartnerBonus               = Math.round(finalRainSurcharge * 0.5);
+      const rainPartnerBonus = Math.round(finalRainSurcharge * 0.5);
       const distanceServiceFeePartnerBonus = Math.round(finalDistanceServiceFee * 0.5);
 
       // ── Food/regular delivery partner earning ─────────────────────────────────
       // 70% of raw area charge (always, even when free delivery is applied to customer)
       // + 50% of rain surcharge + 50% of distance service fee
       // Always stored regardless of whether a partner was found.
-      const rawAreaCharge       = needsDeliveryArea ? deliveryCharge : 0;
+      const rawAreaCharge = needsDeliveryArea ? deliveryCharge : 0;
       const areaFeePartnerShare = Math.round(rawAreaCharge * 0.7);
       const finalDeliveryPartnerEarning =
         areaFeePartnerShare + rainPartnerBonus + distanceServiceFeePartnerBonus;
@@ -650,7 +668,7 @@ export function useCheckout() {
         // User
         userId: user.uid,
         userEmail: user.email ?? '',
-        userName: user.displayName ?? '',
+        userName: user.name ?? '',
         userMobile: mobile.trim(),
 
         // Restaurants
@@ -861,6 +879,7 @@ export function useCheckout() {
     deliveryCharge: effectiveDeliveryCharge,
     rawDeliveryCharge: deliveryCharge,
     freeDelivery,
+    freeDeliveryMinOrder,
     rainSurcharge,
     rainMessage,
     distanceServiceFee,
