@@ -161,9 +161,8 @@ export default function ProductDetail() {
               >
                 <Heart
                   size={18}
-                  className={`transition-all ${
-                    isFavorite(product.id) ? 'fill-red-500 text-red-500 scale-110' : 'text-slate-400 hover:text-red-500'
-                  }`}
+                  className={`transition-all ${isFavorite(product.id) ? 'fill-red-500 text-red-500 scale-110' : 'text-slate-400 hover:text-red-500'
+                    }`}
                 />
               </button>
 
@@ -189,9 +188,8 @@ export default function ProductDetail() {
                   <button
                     key={i}
                     onClick={() => setActiveImg(i)}
-                    className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
-                      activeImg === i ? 'border-orange-500' : 'border-transparent opacity-60'
-                    }`}
+                    className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${activeImg === i ? 'border-orange-500' : 'border-transparent opacity-60'
+                      }`}
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
                   </button>
@@ -262,19 +260,14 @@ export default function ProductDetail() {
                   className="w-full flex items-center gap-3 bg-slate-50 hover:bg-orange-50 border border-slate-200 hover:border-orange-200 p-4 rounded-2xl transition-all cursor-pointer text-left"
                 >
                   <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
-                    <UtensilsCrossed size={18} className="text-orange-500" />
+                    <img src={restaurant.logo || ""} alt="" className="w-full h-full object-cover rounded-full" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-slate-800 text-sm truncate">{restaurant.name}</p>
-                    {restaurant.address && (
-                      <p className="text-slate-400 text-xs font-medium flex items-center gap-1 mt-0.5">
-                        <MapPin size={10} /> {restaurant.address}
-                      </p>
-                    )}
+
                   </div>
-                  <span className={`text-xs font-bold shrink-0 ${
-                    isRestaurantClosed ? 'text-red-500' : 'text-orange-500'
-                  }`}>
+                  <span className={`text-xs font-bold shrink-0 ${isRestaurantClosed ? 'text-red-500' : 'text-orange-500'
+                    }`}>
                     {isRestaurantClosed ? '● Closed' : 'View →'}
                   </span>
                 </button>

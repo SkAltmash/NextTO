@@ -52,14 +52,9 @@ export default function GrocerySection() {
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <ShoppingBasket size={18} className="text-white" />
-            </div>
-            <div>
+          <div>
               <h2 className="text-xl font-black text-slate-900">Grocery Essentials</h2>
               <p className="text-slate-400 text-xs font-semibold mt-0.5">Daily needs delivered fast</p>
-            </div>
           </div>
 
           <motion.button
@@ -80,15 +75,29 @@ export default function GrocerySection() {
           </div>
         ) : (
           <>
-            {/* Horizontal scroll row */}
-            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6">
+            {/* Mobile: 2×2 grid (4 items) | Desktop: horizontal scroll row */}
+            <div className="grid grid-cols-2 gap-3 sm:hidden">
+              {items.slice(0, 4).map((product, i) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                >
+                  <ProductCard product={product} />
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Desktop: horizontal scroll row (hidden on mobile) */}
+            <div className="hidden sm:flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-6 px-6">
               {items.map((product, i) => (
                 <motion.div
                   key={product.id}
                   initial={{ opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.04 }}
-                  className="shrink-0 w-44 sm:w-48"
+                  className="shrink-0 w-48"
                 >
                   <ProductCard product={product} />
                 </motion.div>

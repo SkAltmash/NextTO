@@ -48,7 +48,7 @@ export default function SpecialsSection() {
           <div>
             <div className="flex items-center gap-2">
               <Sparkles size={20} className="text-amber-500 animate-pulse" />
-              <h2 className="text-xl font-black text-slate-900">Today's Specials</h2>
+              <h2 className="text-xl font-black text-slate-900">Specials</h2>
             </div>
             <p className="text-slate-400 text-xs font-semibold mt-0.5">
               Handpicked premium items just for you
@@ -62,10 +62,13 @@ export default function SpecialsSection() {
           </button>
         </div>
 
-        {/* Product Cards Grid (4-5 items) */}
-        <div className="flex overflow-x-auto pb-4 -mx-4 px-4 gap-4 scrollbar-hide sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:mx-0 sm:px-0 sm:pb-0">
-          {specials.slice(0, 5).map((product) => (
-            <div key={product.id} className="w-[190px] shrink-0 sm:w-auto">
+        {/* Mobile: 2x2 grid (4 items) | Desktop: up to 5-col grid */}
+        <div className="grid grid-cols-2 gap-3 sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
+          {specials.slice(0, 5).map((product, i) => (
+            <div
+              key={product.id}
+              className={i === 4 ? 'hidden sm:block' : ''}
+            >
               <ProductCard product={product} />
             </div>
           ))}

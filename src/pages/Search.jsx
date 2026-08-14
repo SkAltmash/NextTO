@@ -88,9 +88,8 @@ function ProductResult({ product, searchWords }) {
         >
           <Heart
             size={10}
-            className={`transition-colors ${
-              isFavorite(product.id) ? 'fill-red-500 text-red-500' : 'text-slate-400 hover:text-red-500'
-            }`}
+            className={`transition-colors ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : 'text-slate-400 hover:text-red-500'
+              }`}
           />
         </button>
       </div>
@@ -98,12 +97,11 @@ function ProductResult({ product, searchWords }) {
         <p className="font-black text-slate-900 text-sm truncate flex items-center gap-1.5 flex-wrap">
           <HighlightText text={product.name} searchWords={searchWords} />
           {product.serviceType && (
-            <span className={`inline-block border text-[10px] font-black px-2 py-0.5 rounded-full capitalize ${
-              product.serviceType.toLowerCase() === 'food' ? 'bg-orange-50 text-orange-600 border-orange-100' :
-              product.serviceType.toLowerCase() === 'grocery' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-              product.serviceType.toLowerCase() === 'medicine' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-              'bg-purple-50 text-purple-600 border-purple-100'
-            }`}>
+            <span className={`inline-block border text-[10px] font-black px-2 py-0.5 rounded-full capitalize ${product.serviceType.toLowerCase() === 'food' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                product.serviceType.toLowerCase() === 'grocery' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                  product.serviceType.toLowerCase() === 'medicine' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                    'bg-purple-50 text-purple-600 border-purple-100'
+              }`}>
               in {product.serviceType}
             </span>
           )}
@@ -155,9 +153,9 @@ function ProductResult({ product, searchWords }) {
 
 /* ─── category result card ─── */
 const CAT_GRADIENT = {
-  food:     'from-orange-400 to-amber-500',
+  food: 'from-orange-400 to-amber-500',
   medicine: 'from-blue-400 to-cyan-500',
-  grocery:  'from-emerald-400 to-teal-500',
+  grocery: 'from-emerald-400 to-teal-500',
 };
 function CategoryResult({ category, searchWords }) {
   const navigate = useNavigate();
@@ -206,11 +204,7 @@ function RestaurantResult({ restaurant, searchWords }) {
         <p className="font-black text-slate-900 text-sm truncate">
           <HighlightText text={restaurant.name} searchWords={searchWords} />
         </p>
-        {restaurant.address && (
-          <p className="flex items-center gap-1 text-slate-400 text-xs font-medium mt-0.5 truncate">
-            <MapPin size={10} className="shrink-0" /> {restaurant.address}
-          </p>
-        )}
+
         <div className="flex items-center gap-1.5 mt-1">
           <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${restaurant.isOpen ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'}`}>
             {restaurant.isOpen ? 'Open' : 'Closed'}
@@ -435,7 +429,7 @@ export default function Search() {
                 We couldn't find matches on our website, but we can still deliver it to you!
               </p>
             </div>
-            
+
             <a
               href={`https://wa.me/917972081926?text=${encodeURIComponent(`Hello Food Express! I searched for "${queryText}" on your website but couldn't find it. Can I order this here?`)}`}
               target="_blank"

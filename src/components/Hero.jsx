@@ -16,6 +16,14 @@ const shimmerStyle = `
   background-size: 700px 100%;
   animation: hero-shimmer 1.4s infinite linear;
 }
+.hero-image-wrap {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: #f1f1f1;
+  /* Exact image dimensions: 1600 x 600 = 8:3 ratio */
+  aspect-ratio: 8 / 3;
+}
 `;
 if (typeof document !== "undefined" && !document.getElementById("hero-shimmer-css")) {
   const tag = document.createElement("style");
@@ -27,23 +35,7 @@ if (typeof document !== "undefined" && !document.getElementById("hero-shimmer-cs
 function HeroBannerSkeleton() {
   return (
     <div className="w-full -mt-14 md:mt-0">
-      {/* image placeholder */}
-      <div
-        className="hero-shimmer w-full"
-        style={{ aspectRatio: "16 / 6", minHeight: "160px" }}
-      />
-      {/* text strip placeholder */}
-      <div className="bg-white border-b border-slate-100 px-4 sm:px-8 lg:px-12 py-3 flex items-center justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <div className="hero-shimmer h-2.5 w-24 rounded-full" />
-          <div className="hero-shimmer h-4 w-48 rounded-full" />
-        </div>
-        <div className="flex gap-1.5 shrink-0">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="hero-shimmer h-1.5 w-1.5 rounded-full" />
-          ))}
-        </div>
-      </div>
+      <div className="hero-shimmer hero-image-wrap" />
     </div>
   );
 }
@@ -107,10 +99,7 @@ function HeroBannerSlider({ slides }) {
   return (
     <div className="w-full">
       {/* ── IMAGE AREA (clickable) ── */}
-      <div
-        className="relative w-full  overflow-hidden bg-slate-100"
-        style={{ aspectRatio: "16 / 6", }}
-      >
+      <div className="hero-image-wrap">
         <AnimatePresence custom={direction} initial={false} mode="popLayout">
           <motion.div
             key={slide.id ?? current}
@@ -151,6 +140,24 @@ function HeroBannerSlider({ slides }) {
           </>
         )}
 
+        {/* ── dot indicators overlay ── */}
+        {slides.length > 1 && (
+          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                onClick={(e) => { e.stopPropagation(); handleDot(i); }}
+                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                  i === current
+                    ? "w-5 bg-white"
+                    : "w-1.5 bg-white/50 hover:bg-white/80"
+                }`}
+                aria-label={`Go to slide ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
         {/* progress bar */}
         <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/10 z-10">
           <motion.div
@@ -163,48 +170,6 @@ function HeroBannerSlider({ slides }) {
           />
         </div>
       </div>
-
-      {/* ── TEXT STRIP (below image) ── */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`text-${slide.id ?? current}`}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-          className="bg-white border-b border-slate-100 px-4 sm:px-8 lg:px-12 py-3 flex flex-row items-center justify-between gap-3"
-        >
-          <div>
-            {slide.subtitle && (
-              <p className="text-orange-500 text-[10px] font-extrabold uppercase tracking-widest mb-0.5">
-                ⚡ {slide.subtitle}
-              </p>
-            )}
-            {slide.title && (
-              <h2 className="text-slate-800 text-sm sm:text-base font-black leading-snug">
-                {slide.title}
-              </h2>
-            )}
-          </div>
-
-          {/* dot indicators */}
-          {slides.length > 1 && (
-            <div className="flex gap-1.5 shrink-0">
-              {slides.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleDot(i)}
-                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${i === current
-                    ? "w-5 bg-orange-500"
-                    : "w-1.5 bg-slate-300 hover:bg-slate-400"
-                    }`}
-                  aria-label={`Go to slide ${i + 1}`}
-                />
-              ))}
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
     </div>
   );
 }
