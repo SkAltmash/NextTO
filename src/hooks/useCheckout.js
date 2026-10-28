@@ -52,6 +52,23 @@ async function fetchDeliveryLocation(location) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : location;
 }
 
+// Used when config/deliveryPartner.commissionPercent is missing, invalid or unreadable,
+// so a config problem never blocks checkout (matches the previous hardcoded 70%).
+const DEFAULT_PARTNER_COMMISSION_PERCENT = 70;
+
+/** Returns the partner's share of delivery charges as a fraction (e.g. 0.7). */
+async function getPartnerCommissionRate() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'deliveryPartner'));
+    const percent = Number(snap.data()?.commissionPercent);
+    if (Number.isFinite(percent) && percent >= 1 && percent <= 100) return percent / 100;
+    console.warn('[useCheckout] Invalid config/deliveryPartner.commissionPercent, using default');
+  } catch (err) {
+    console.warn('[useCheckout] fetchPartnerCommission:', err);
+  }
+  return DEFAULT_PARTNER_COMMISSION_PERCENT / 100;
+}
+
 // ─── Atomic delivery-partner assignment (ported from User App) ────────────────
 
 /**
@@ -627,25 +644,28 @@ export function useCheckout() {
       const restDocData = restaurantDataMap[firstRestId];
       const finalDistanceServiceFee = numberValue(restDocData?.distanceServiceFee ?? distanceServiceFee);
 
+      // Read fresh at order time — this drives a financial value persisted on the order.
+      const partnerCommissionRate = await getPartnerCommissionRate();
+
       // ── Shared partner bonus components ───────────────────────────────────────
       const rainPartnerBonus = Math.round(finalRainSurcharge * 0.5);
       const distanceServiceFeePartnerBonus = Math.round(finalDistanceServiceFee * 0.5);
 
       // ── Food/regular delivery partner earning ─────────────────────────────────
-      // 70% of raw area charge (always, even when free delivery is applied to customer)
+      // commissionPercent (config/deliveryPartner) of raw area charge (always, even when free delivery is applied to customer)
       // + 50% of rain surcharge + 50% of distance service fee
       // Always stored regardless of whether a partner was found.
       const rawAreaCharge = needsDeliveryArea ? deliveryCharge : 0;
-      const areaFeePartnerShare = Math.round(rawAreaCharge * 0.7);
+      const areaFeePartnerShare = Math.round(rawAreaCharge * partnerCommissionRate);
       const finalDeliveryPartnerEarning =
         areaFeePartnerShare + rainPartnerBonus + distanceServiceFeePartnerBonus;
 
       // ── Pickup & Drop partner earning ─────────────────────────────────────────
-      // 70% of (Area A + Area B raw) + 50% of rain + 50% of distance fee
+      // commissionPercent of totalCharge + 50% of rain + 50% of distance fee
       // Always stored even if no partner was found (order still saves).
       if (pickupDropDetails) {
         const pdEarning =
-          Math.round(pickupDropDetails.totalCharge * 0.7) + // 70% of totalCharge = 70%(70%(A+B))
+          Math.round(pickupDropDetails.totalCharge * partnerCommissionRate) + // commissionPercent of totalCharge
           rainPartnerBonus +                              // 50% of rain surcharge
           distanceServiceFeePartnerBonus;                 // 50% of distance fee
         pickupDropDetails = { ...pickupDropDetails, deliveryPartnerEarning: pdEarning };
@@ -684,7 +704,7 @@ export function useCheckout() {
         pickupDrop: pickupDropDetails,
         pickupDropPartnerId: pickupDropDetails?.assignedPartnerId ?? '',
         pickupDropPartnerName: pickupDropDetails?.assignedPartnerName ?? '',
-        // deliveryPartnerEarning is always set (70% of raw + 50% bonuses) even if no partner found
+        // deliveryPartnerEarning is always set (commissionPercent of raw + 50% bonuses) even if no partner found
         pickupDropPartnerEarning: pickupDropDetails?.deliveryPartnerEarning ?? 0,
 
         // Delivery
@@ -699,12 +719,12 @@ export function useCheckout() {
         deliveryPartnerName,
         deliveryPartnerNumber,
         // For pickup-drop orders: earning comes from pickupDropDetails (set in Step 8)
-        // For food orders: earning = 70% area + 50% rain + 50% distance (always stored)
+        // For food orders: earning = commissionPercent area + 50% rain + 50% distance (always stored)
         deliveryPartnerEarning: pickupDropOnly
           ? (pickupDropDetails?.deliveryPartnerEarning ?? 0)
           : finalDeliveryPartnerEarning,
         // Earning breakdown (for admin/settlement reference)
-        areaFeePartnerShare: pickupDropOnly ? 0 : areaFeePartnerShare, // 70% of raw delivery charge
+        areaFeePartnerShare: pickupDropOnly ? 0 : areaFeePartnerShare, // commissionPercent of raw delivery charge
 
         // Coupon
         appliedCouponId: finalCouponId,
