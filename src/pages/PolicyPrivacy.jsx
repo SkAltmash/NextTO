@@ -165,6 +165,33 @@ export default function PrivacyPolicy() {
           );
         })}
 
+        {/* Partner app policy */}
+        <motion.div
+          custom={sections.length}
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-7"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-orange-50 border border-orange-100 rounded-xl flex items-center justify-center shrink-0">
+              <Handshake size={17} className="text-orange-500" />
+            </div>
+            <h2 className="text-base sm:text-lg font-black text-slate-900">NextTo Partner App</h2>
+          </div>
+          <p className="text-slate-500 text-sm font-medium leading-relaxed mb-4">
+            Restaurant and shop owners who use the NextTo Partner app: the data we collect for partner accounts is described in a separate policy.
+          </p>
+          <a
+            href="/partner-privacy-policy.html"
+            className="inline-flex items-center gap-2 text-orange-600 font-black text-sm hover:text-orange-700 transition-colors"
+          >
+            Read the Partner App Privacy Policy
+            <ChevronRight size={14} />
+          </a>
+        </motion.div>
+
         {/* Contact box */}
         <motion.div
           custom={sections.length}
