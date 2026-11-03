@@ -183,13 +183,13 @@ export default function PrivacyPolicy() {
           <p className="text-slate-500 text-sm font-medium leading-relaxed mb-4">
             Restaurant and shop owners who use the NextTo Partner app: the data we collect for partner accounts is described in a separate policy.
           </p>
-          <a
-            href="/partner-privacy-policy.html"
+          <Link
+            to="/partner-privacy-policy"
             className="inline-flex items-center gap-2 text-orange-600 font-black text-sm hover:text-orange-700 transition-colors"
           >
             Read the Partner App Privacy Policy
             <ChevronRight size={14} />
-          </a>
+          </Link>
         </motion.div>
 
         {/* Contact box */}

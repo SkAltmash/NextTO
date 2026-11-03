@@ -19,6 +19,7 @@ import Categories from './pages/Categories';
 import Search from './pages/Search';
 import CategoryDetail from './pages/CategoryDetail';
 import PrivacyPolicy from './pages/PolicyPrivacy';
+import PartnerPrivacy from './pages/PartnerPrivacy';
 import TermsOfService from './pages/PolicyTerms';
 import DeleteAccount from './pages/DeleteAccount';
 import Help from './pages/Help';
@@ -86,6 +87,7 @@ function AppLayout() {
           <Route path="/categories" element={<Categories />} />
           <Route path="/categories/:id" element={<CategoryDetail />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/partner-privacy-policy" element={<PartnerPrivacy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/delete-account" element={<DeleteAccount />} />
           <Route path="/help" element={<Help />} />
